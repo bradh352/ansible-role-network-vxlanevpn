@@ -1,0 +1,132 @@
+{% if network_vtep_ip is not defined %}
+{{ notdefined | mandatory(msg='network_vtep_ip must be defined') }}
+{% endif %}
+network:
+  version: 2
+{# Create the VXLAN Tunnels for each one the host uses in form of vxlan{{ vni }} #}
+{% if network_vxlan_interfaces|default([])|count > 0 %}
+  tunnels:
+{%   for interface in network_vxlan_interfaces %}
+    vxlan{{ interface.vni }}:
+      mode: vxlan
+      local: {{ network_vtep_ip|split('/')|first }}
+      id: {{ interface.vni }}
+      mac-learning: false
+      port: 4789
+{%   endfor %}
+{% endif %}
+{# Must create a bridge per vxlan #}
+{% if network_vxlan_interfaces|default([])|count > 0 %}
+  bridges:
+{%   for interface in network_vxlan_interfaces %}
+{# User-specified interface name is bridge name.  We are assigning IPs, etc to #}
+{# the bridge itself instead of attaching a virtual interface. #}
+    {{ interface.name }}:
+      dhcp4: no
+      dhcp6: no
+      accept-ra: no
+      interfaces:
+        - vxlan{{ interface.vni }}
+      link-local: [ ]
+      mtu: {{ interface.mtu|default(1500) }}
+{%     if interface.dhcp|default(false) %}
+      dhcp4: true
+      accept-ra: true
+{%     elif interface.addresses|default([])|count > 0 %}
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+      addresses:
+{%       for address in interface.addresses %}
+        - {{ address }}
+{%       endfor %}
+{%     endif %}
+{%     if interface.routes|default([])|count > 0 %}
+      routes:
+{%       for route in interface.routes %}
+        - to: {{ route.to }}
+          via: {{ route.via }}
+{%       endfor %}
+{%     endif %}
+{%     if interface.nameservers is defined %}
+      nameservers:
+{%       if interface.nameservers.addresses|default([])|count > 0 %}
+        addresses:
+{%         for address in interface.nameservers.addresses %}
+          - {{ address }}
+{%         endfor %}
+{%       endif %}
+{%     endif %}
+{%     if interface.nameservers.search|default([])|count > 0 %}
+        search:
+{%       for search in interface.nameservers.search %}
+          - {{ search }}
+{%       endfor %}
+{%     endif %}
+{%   endfor %}
+{% endif %}
+  ethernets:
+    lo:
+      match:
+        name: lo
+      addresses:
+        - 127.0.0.1/8
+        - ::1/128
+        - {{ network_vtep_ip|split('/')|first }}/32
+{# For each underlay interface, configure it, enable ipv6 link-local #}
+{% for interface in network_vxlanevpn_interfaces %}
+    {{ interface }}:
+      link-local: [ ipv6 ]
+      mtu: {{ network_underlay_mtu|default(9100) }}
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+{% endfor %}
+{# User specified fallback interfaces, configure here #}
+{% for interface in network_interfaces|default([]) %}
+    {{ interface.ifname }}:
+      link-local: [ ipv6 ]
+      mtu: {{ interface.mtu|default(1500) }}
+{%   if interface.dhcp|default(false) %}
+      dhcp4: true
+      accept-ra: true
+      dhcp4-overrides:
+        use-dns: false
+        use-ntp: false
+        use-routes: false
+        use-domains: false
+      ra-overrides:
+        use-dns: false
+        use-domains: false
+{%   elif interface.addresses|default([])|count > 0 %}
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+      addresses:
+{%     for address in interface.addresses %}
+        - {{ address }}
+{%     endfor %}
+{%   endif %}
+{%   if interface.routes|default([])|count > 0 %}
+      routes:
+{%     for route in interface.routes %}
+        - to: {{ route.to }}
+          via: {{ route.via }}
+{%     endfor %}
+{%   endif %}
+{%   if interface.nameservers is defined %}
+      nameservers:
+{%     if interface.nameservers.addresses|default([])|count > 0 %}
+        addresses:
+{%       for address in interface.nameservers.addresses %}
+          - {{ address }}
+{%       endfor %}
+{%     endif %}
+{%   endif %}
+{%   if interface.nameservers.search|default([])|count > 0 %}
+        search:
+{%     for search in interface.nameservers.search %}
+          - {{ search }}
+{%     endfor %}
+{%   endif %}
+{% endfor %}

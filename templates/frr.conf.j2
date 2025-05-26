@@ -1,0 +1,71 @@
+service integrated-vtysh-config
+hostname {{ inventory_hostname }}
+!
+log syslog informational
+!
+!
+{% if network_underlay_asn is not defined %}
+{{ notdefined | mandatory(msg='network_underlay_asn must be defined') }}
+{% endif %}
+{% if network_vtep_ip is not defined %}
+{{ notdefined | mandatory(msg='network_vtep_ip must be defined') }}
+{% endif %}
+
+!
+! Export any IPs in lo as these are our VTEPs
+route-map EXPORT permit 1
+match interface lo
+!
+! Redistribute prefixes learned via BGP
+route-map EXPORT permit 2
+  match large-community {{ network_underlay_asn }}:10:0
+!
+! Tag route learned through BGP
+route-map IMPORT permit 1
+  set large-community {{ network_underlay_asn }}:10:0
+!
+! Permit everything
+route-map PERMIT permit 1
+!
+!
+router bgp {{ network_underlay_asn }}
+  bgp router-id {{ network_vtep_ip|split('/')|first }}
+  bgp ebgp-requires-policy
+  bgp log-neighbor-changes
+  ! Enable ECMP on multiple eBGP paths
+  bgp bestpath as-path multipath-relax
+  ! Don't install more than 2 paths for ECMP
+  maximum-paths 2
+  !
+  neighbor PEERS peer-group
+  neighbor PEERS remote-as external
+  neighbor PEERS timers 3 9
+  neighbor PEERS advertisement-interval 5
+  neighbor PEERS bfd
+  neighbor PEERS capability extended-nexthop
+
+  address-family ipv4 unicast
+    neighbor PEERS activate
+    neighbor PEERS route-map IMPORT in
+    neighbor PEERS route-map EXPORT out
+    redistribute connected
+  !
+  address-family ipv6 unicast
+    neighbor PEERS activate
+    neighbor PEERS route-map IMPORT in
+    neighbor PEERS route-map EXPORT out
+    redistribute connected
+  !
+  address-family l2vpn evpn
+    neighbor PEERS activate
+    neighbor PEERS route-map PERMIT in
+    neighbor PEERS route-map PERMIT out
+    neighbor PEERS attribute-unchanged next-hop
+    autort rfc8365-compatible
+    advertise-all-vni
+    advertise-svi-ip
+  !
+{% for interface in network_vxlanevpn_interfaces %}
+  neighbor {{ interface }} interface peer-group PEERS
+{% endfor %}
+!

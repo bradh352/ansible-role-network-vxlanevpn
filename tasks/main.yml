@@ -1,0 +1,170 @@
+---
+
+- name: "APT: Install required packages"
+  ansible.builtin.apt:
+    pkg:
+      - netplan.io
+      - frr
+      - ufw
+    state: present
+
+- name: "APT: Purge undesired packages"
+  ansible.builtin.apt:
+    pkg:
+      - ifupdown
+      - ifupdown2
+      - ifupdown-ng
+    purge: true
+    state: absent
+
+- name: "Gather interface mappings"
+  set_fact:
+    network_vxlanevpn_interfaces_json: "{{ lookup('template', 'resolve_vxlan_interfaces.j2') }}"
+
+- name: "Parse interface mappings"
+  set_fact:
+    network_vxlanevpn_interfaces: "{{ network_vxlanevpn_interfaces_json|from_yaml }}"
+
+- name: "FRR: enable bgp and bfd"
+  lineinfile:
+     path: /etc/frr/daemons
+     regexp: "^{{ item.key }}=.*"
+     line: "{{ item.key }}={{ item.val }}"
+     state: present
+  with_items:
+    - key: "bgpd"
+      val: "yes"
+    - key: "bfdd"
+      val: "yes"
+  notify: frr_restart
+
+# Flush handlers as frr_restart can interrupt.
+- name: "Flush handlers"
+  ansible.builtin.meta: flush_handlers
+
+- name: Find interfaces configuration
+  find:
+    paths: /etc/netplan
+    file_type: file
+    excludes:
+      - "config.yaml"
+  register: netplan_files
+
+- name: Delete unused netplan configuration
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  with_items: "{{ netplan_files['files'] }}"
+
+- name: "NetPlan: write configuration"
+  template:
+    src: netplan.conf.j2
+    dest: /etc/netplan/config.yaml
+    mode: "600"
+  register: netplan
+
+# - name: "ifupdown-ng: write configuration"
+#   template:
+#     src: interfaces.j2
+#     dest: /etc/network/interfaces
+#     mode: "600"
+#   register: interfaces
+
+
+
+- name: "FRR: write configuration"
+  template:
+    backup: true
+    src: frr.conf.j2
+    dest: /etc/frr/frr.conf
+    mode: "660"
+  notify: frr_reload
+
+- name: "Instruct networkd not to mess with our routes"
+  community.general.ini_file:
+    path: /etc/systemd/networkd.conf
+    no_extra_spaces: true
+    section: "{{ item.section }}"
+    option: "{{ item.key }}"
+    value: "{{ item.val }}"
+  with_items:
+    - section: "Network"
+      key: "ManageForeignNextHops"
+      val: "no"
+    - section: "Network"
+      key: "ManageForeignRoutes"
+      val: "no"
+    - section: "Network"
+      key: "ManageForeignRoutingPolicyRules"
+      val: "no"
+  notify: networkctl_reload
+
+- name: "FRR: ensure enabled and started"
+  service:
+    name: frr
+    state: started
+    enabled: true
+
+- name: "UFW: allow BGP unnumbered"
+  community.general.ufw:
+    rule: allow
+    port: 179
+    proto: tcp
+    src: "fe80::/10"
+    dest: "fe80::/10"
+
+- name: "UFW: allow BFD"
+  community.general.ufw:
+    rule: allow
+    port: 3784
+    proto: udp
+    src: "fe80::/10"
+    dest: "fe80::/10"
+
+- name: "UFW: allow VXLAN VTEP"
+  community.general.ufw:
+    rule: allow
+    port: 4789
+    proto: udp
+    src: "{{ network_vtep_ip }}"
+    dest: "{{ network_vtep_ip|split('/')|first }}/32"
+
+- name: "UFW: ensure ufw is enabled and started"
+  service:
+    name: ufw
+    state: started
+    enabled: true
+
+# - name: "Disable systemd-networkd"
+#   service:
+#     name: systemd-networkd-wait-online
+#     enabled: false
+
+# - name: "Mask systemd-networkd-wait-online"
+#   ansible.builtin.systemd_service:
+#     name: systemd-networkd-wait-online
+#     masked: true
+
+# - name: "Enable ifupdown2-ng networking"
+#   service:
+#     name: networking
+#     enabled: true
+
+- name: "VXLAN configuration changed, rebooting...(one node at a time)"
+  reboot:
+    msg: "rebooting now"
+    connect_timeout: 10
+    post_reboot_delay: 60
+  when: netplan.changed
+  throttle: 1
+
+- name: Refresh facts
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+  when: netplan.changed
+
+# We want to flush any handlers to make sure BGP comes online at this point as
+# other roles may require connectivity provided.
+- name: "Flush handlers"
+  ansible.builtin.meta: flush_handlers

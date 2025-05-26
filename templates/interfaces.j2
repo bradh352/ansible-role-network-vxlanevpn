@@ -1,0 +1,98 @@
+{% if network_vtep_ip is not defined %}
+{{ notdefined | mandatory(msg='network_vtep_ip must be defined') }}
+{% endif %}
+auto lo
+iface lo inet loopback
+  address 127.0.0.1/8
+  address ::1/128
+  address {{ network_vtep_ip|split('/')|first }}/32
+  vxlan-local-tunnelip {{ network_vtep_ip|split('/')|first }}
+
+{# For each underlay interface, configure it #}
+{% for interface in network_vxlanevpn_interfaces %}
+auto {{ interface }}
+iface {{ interface }}
+  mtu {{ network_underlay_mtu|default(9100) }}
+
+{% endfor %}
+
+{# Create a VNI interface for each one we want to access locally #}
+{% for interface in network_vxlan_interfaces %}
+auto vni{{ interface.vni }}
+iface vni{{ interface.vni }}
+  vxlan-id {{ interface.vni }}
+  vxlan-learning off
+  bridge-access {{ interface.vlan_map|default(interface.vni) }}
+
+{% endfor %}
+
+{% for bridge in network_vxlan_interfaces | map(attribute='bridge', default='br0') | unique | sort %}
+{%   set bridge_ports = [] %}
+{%   set bridge_vids = [] %}
+{%   for interface in network_vxlan_interfaces %}
+{%     if interface.bridge|default('br0') == bridge %}
+{%       do bridge_ports.append('vni' ~ interface.vni) %}
+{%       do bridge_vids.append(interface.vlan_map|default(interface.vni)) %}
+{%     endif %}
+{%   endfor %}
+auto {{ bridge }}
+iface {{ bridge }}
+  bridge-ports {{ bridge_ports| join(" ") }}
+  bridge-vlan-aware yes
+  bridge-vids {{ bridge_vids | join(" ") }}
+  bridge-pvid 1
+
+{% endfor %}
+
+{# User-specified interface name for each break out #}
+{% for interface in network_vxlan_interfaces %}
+auto {{ interface.name }}
+iface {{ interface.name }}{{ 'inet dhcp' if interface.dhcp|default(false) else '' }}
+  vlan-id {{ interface.vlan_map|default(interface.vni) }}
+  vlan-raw-device {{ interface.bridge | default('br0') }}
+  mtu {{ interface.mtu|default(1500) }}
+  accept-ra 0
+{%   for address in interface.addresses|default([]) %}
+  address {{ address }}
+{%   endfor %}
+{%   if interface.nameservers.addresses|default([])|length > 0 %}
+  dns-nameservers {{ interface.nameservers.addresses|join(" ") }}
+{%   endif %}
+{%   if interface.nameservers.search|default([])|length > 0 %}
+  dns-search {{ interface.nameservers.addresses|join(" ") }}
+{%   endif %}
+{%   for route in interface.routes|default([]) %}
+{%     if route.to == "0.0.0.0/0" or route.to == '::0/0' %}
+  gateway {{ route.via }}
+{%     else %}
+  post-up ip route add {{ route.to }} via {{ route.via }} dev {{ interface.name }}
+  pre-down ip route del {{ route.to }} via {{ route.via }} dev {{ interface.name }}
+{%     endif %}
+{%   endfor %}
+
+{% endfor %}
+
+{# User specified fallback interfaces, configure here #}
+{% for interface in network_interfaces|default([]) %}
+auto {{ interface.name }}
+iface {{ interface.name }}{{ 'inet dhcp' if interface.dhcp|default(false) else '' }}
+  mtu {{ interface.mtu|default(1500) }}
+{%   for address in interface.addresses|default([]) %}
+  address {{ address }}
+{%   endfor %}
+{%   if interface.nameservers.addresses|default([])|length > 0 %}
+  dns-nameservers {{ interface.nameservers.addresses|join(" ") }}
+{%   endif %}
+{%   if interface.nameservers.search|default([])|length > 0 %}
+  dns-search {{ interface.nameservers.addresses|join(" ") }}
+{%   endif %}
+{%   for route in interface.routes|default([]) %}
+{%     if route.to == "0.0.0.0/0" or route.to == '::0/0' %}
+  gateway {{ route.via }}
+{%     else %}
+  post-up ip route add {{ route.to }} via {{ route.via }} dev {{ interface.name }}
+  pre-down ip route del {{ route.to }} via {{ route.via }} dev {{ interface.name }}
+{%     endif %}
+{%   endfor %}
+
+{% endfor %}
