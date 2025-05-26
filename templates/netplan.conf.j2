@@ -11,6 +11,7 @@ network:
       mode: vxlan
       local: {{ network_vtep_ip|split('/')|first }}
       id: {{ interface.vni }}
+      mtu: {{ interface.mtu|default(1500) }}
       mac-learning: false
       port: 4789
 {%   endfor %}
