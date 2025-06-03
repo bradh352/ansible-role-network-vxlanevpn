@@ -37,5 +37,4 @@
 {%     endif %}
 {%   endif %}
 {% endfor %}
-{# This list is output in the same order as network_underlay_interfaces so it can be referenced by index #}
-{{- iface_list -}}
+{{- iface_list | sort(attribute='ifname') -}}
