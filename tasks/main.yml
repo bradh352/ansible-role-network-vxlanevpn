@@ -74,7 +74,7 @@
   template:
     src: pre-up-hooks.j2
     dest: /etc/networkd-dispatcher/configuring.d/50-pre-up.sh
-    mode: "700"
+    mode: "755"
   register: netplan
 
 - name: "NetPlan: ensure networkd-dispatcher is started"
