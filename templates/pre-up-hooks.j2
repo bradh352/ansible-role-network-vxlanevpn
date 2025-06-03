@@ -5,13 +5,13 @@ case "$IFACE" in
       ethtool --set-fec {{ network_vxlanevpn_interfaces[loop.index] }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
       ethtool -s {{ network_vxlanevpn_interfaces[loop.index] }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
-{% endif %}
+{% endfor %}
 {% for interface in network_interfaces %}
     {{ interface.if_name }})
       ethtool --set-fec {{ interface.if_name }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
       ethtool -s {{ network_vxlanevpn_interfaces[loop.index] }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
-{% endif %}
+{% endfor %}
     *)
       ;;
 esac
