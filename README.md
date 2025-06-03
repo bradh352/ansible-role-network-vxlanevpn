@@ -35,6 +35,13 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
     * `macaddr`: Mac address of interface
     * `driver`: Driver module to match on.  This can add more than one interface
       at a time.  e.g. `mlx5_core`, `ixgbe`
+    * `speed`: To set a specific speed in Mb/s, e.g. `10000`, `25000`, `100000`.
+      Defaults to whatever the NIC default is.
+    * `autonegotiation`: Boolean. Whether or not to enable autonegotiation.
+      Default is `true`.
+    * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
+      `llrs`. Defaults to `auto` if link speed specified is less than `25000`
+      otherwise defaults to `auto` (including if link speed not specifed).
 * `network_underlay_mtu`: MTU to use for all underlay interfaces.  Defaults
   to `9100` if not specified.  This must be at least 54 bytes greater than
   the largest `network_vxlan_interfaces` mtu.
@@ -83,6 +90,13 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
     * `addresses`: List of addresses for nameservers,
       e.g. `8.8.8.8` or `2001:4860:4860::8888`
     * `search`: List of search domains, e.g. `internal.example.com`
+  * `speed`: To set a specific speed in Mb/s, e.g. `10000`, `25000`, `100000`.
+    Defaults to whatever the NIC default is.
+  * `autonegotiation`: Boolean. Whether or not to enable autonegotiation.
+    Default is `true`.
+  * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
+    `llrs`. Defaults to `auto` if link speed specified is less than `25000`
+    otherwise defaults to `auto` (including if link speed not specifed).
 
 ***NOTE***: Typically variables will be placed in the host vars, it is
 recommended to create a file like `host_vars/host-fqdn.yml` that contains

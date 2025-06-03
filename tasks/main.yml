@@ -4,6 +4,7 @@
   ansible.builtin.apt:
     pkg:
       - netplan.io
+      - networkd-dispatcher
       - frr
       - ufw
     state: present
@@ -63,14 +64,25 @@
     mode: "600"
   register: netplan
 
+- name: "NetPlan: create pre-up hooks for setting port configuration"
+  template:
+    src: pre-up-hooks.j2
+    dest: /etc/networkd-dispatcher/configuring.d/50-pre-up.sh
+    mode: "700"
+  register: netplan
+
+- name: "NetPlan: ensure networkd-dispatcher is started"
+  service:
+    name: networkd-dispatcher
+    state: started
+    enabled: true
+
 # - name: "ifupdown-ng: write configuration"
 #   template:
 #     src: interfaces.j2
 #     dest: /etc/network/interfaces
 #     mode: "600"
 #   register: interfaces
-
-
 
 - name: "FRR: write configuration"
   template:
