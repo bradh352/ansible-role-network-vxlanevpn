@@ -12,9 +12,9 @@ network:
       local: {{ network_vtep_ip|split('/')|first }}
       id: {{ interface.vni }}
       mtu: {{ interface.mtu|default(1500) }}
-{#    This seems to interfere with GARP #}
-{#    mac-learning: false #}
+      mac-learning: false
       port: 4789
+      optional: true
 {%   endfor %}
 {% endif %}
 {# Must create a bridge per vxlan #}
@@ -38,6 +38,7 @@ network:
       dhcp4: false
       dhcp6: false
       accept-ra: false
+      optional: true
       addresses:
 {%       for address in interface.addresses %}
         - {{ address }}
@@ -83,6 +84,7 @@ network:
       dhcp4: false
       dhcp6: false
       accept-ra: false
+      optional: true
 {% endfor %}
 {# User specified fallback interfaces, configure here #}
 {% for interface in network_interfaces|default([]) %}
