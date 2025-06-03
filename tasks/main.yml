@@ -64,6 +64,12 @@
     mode: "600"
   register: netplan
 
+- name: "NetPlan: make sure /etc/networkd-dispatcher/configuring.d/ exists"
+  file:
+    path: /etc/networkd-dispatcher/configuring.d/
+    state: directory
+    mode: "755"
+
 - name: "NetPlan: create pre-up hooks for setting port configuration"
   template:
     src: pre-up-hooks.j2
