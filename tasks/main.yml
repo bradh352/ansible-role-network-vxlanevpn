@@ -75,7 +75,7 @@
     src: pre-up-hooks.j2
     dest: /etc/networkd-dispatcher/configuring.d/50-pre-up.sh
     mode: "755"
-  register: netplan
+  register: networkd
 
 - name: "NetPlan: ensure networkd-dispatcher is started"
   service:
@@ -173,14 +173,14 @@
     msg: "rebooting now"
     connect_timeout: 10
     post_reboot_delay: 60
-  when: netplan.changed
+  when: netplan.changed or networkd.changed
   throttle: 1
 
 - name: Refresh facts
   ansible.builtin.setup:
     gather_subset:
       - network
-  when: netplan.changed
+  when: netplan.changed or networkd.changed
 
 # We want to flush any handlers to make sure BGP comes online at this point as
 # other roles may require connectivity provided.
