@@ -7,11 +7,11 @@
 {%     if not interface.ifname in ansible_facts.interfaces %}
 {{ notdefined | mandatory(msg='interface with ifname ' + interface.ifname + ' not found') }}
 {%     endif %}
-{%     do iface_list.append(interface.ifname) %}
+{%     do iface_list.append({ "ifname": interface.ifname } | combine(interface) ) %}
 {%   elif interface.macaddr is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if ansible_facts[host_iface].macaddress == interface.macaddr %}
-{%         do iface_list.append(host_iface) %}
+{%         do iface_list.append({ "ifname": host_iface} | combine(interface) ) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -20,7 +20,7 @@
 {%   elif interface.driver is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if ansible_facts[host_iface].module|default("") == interface.driver %}
-{%         do iface_list.append(host_iface) %}
+{%         do iface_list.append({ "ifname": host_iface} | combine(interface) ) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -29,7 +29,7 @@
 {%   elif interface.pattern is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if host_iface|regex_search(interface.pattern)|length > 0 %}
-{%         do iface_list.append(host_iface) %}
+{%         do iface_list.append({ "ifname": host_iface} | combine(interface) ) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -38,6 +38,4 @@
 {%   endif %}
 {% endfor %}
 {# This list is output in the same order as network_underlay_interfaces so it can be referenced by index #}
-[
-{{ iface_list | join(",") }}
-]
+{{- iface_list -}}

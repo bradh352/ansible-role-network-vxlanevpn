@@ -66,6 +66,6 @@ router bgp {{ network_underlay_asn }}
     advertise-svi-ip
   !
 {% for interface in network_vxlanevpn_interfaces %}
-  neighbor {{ interface }} interface peer-group PEERS
+  neighbor {{ interface.ifname }} interface peer-group PEERS
 {% endfor %}
 !

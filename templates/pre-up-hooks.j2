@@ -1,15 +1,15 @@
 #!/bin/bash
 case "$IFACE" in
-{% for interface in network_underlay_interfaces|default([]) %}
-    {{ network_vxlanevpn_interfaces[loop.index] }})
-      ethtool --set-fec {{ network_vxlanevpn_interfaces[loop.index] }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
-      ethtool -s {{ network_vxlanevpn_interfaces[loop.index] }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
+{% for interface in network_vxlanevpn_interfaces|default([]) %}
+    {{ interface.ifname }})
+      ethtool --set-fec {{ interface.ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
+      ethtool -s {{ interface.ifname }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
 {% endfor %}
 {% for interface in network_interfaces|default([]) %}
     {{ interface.if_name }})
       ethtool --set-fec {{ interface.if_name }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
-      ethtool -s {{ network_vxlanevpn_interfaces[loop.index] }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
+      ethtool -s {{ interface.if_name }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
 {% endfor %}
     *)

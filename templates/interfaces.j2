@@ -10,8 +10,8 @@ iface lo inet loopback
 
 {# For each underlay interface, configure it #}
 {% for interface in network_vxlanevpn_interfaces %}
-auto {{ interface }}
-iface {{ interface }}
+auto {{ interface.ifname }}
+iface {{ interface.ifname }}
   mtu {{ network_underlay_mtu|default(9100) }}
 
 {% endfor %}
