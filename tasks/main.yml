@@ -21,6 +21,7 @@
     url: https://bradhouse.dev/wp-content/uploads/2025/06/frr_8.4.4-1.99deb12u1_amd64.deb
     dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
     mode: "600"
+  become: false
   when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
   delegate_to: localhost
   run_once: true
@@ -42,6 +43,7 @@
     path: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
     state: absent
   delegate_to: localhost
+  become: false
   run_once: true
   when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
 
