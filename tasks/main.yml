@@ -22,6 +22,7 @@
     dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
     mode: "600"
   when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
+  delegate_to: localhost
   run_once: true
 
 - name: "Send patched FRR to remote"
@@ -35,6 +36,16 @@
   shell: "dpkg -i /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb"
   when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
   notify: frr_restart
+
+- name: "Cleanup download"
+  file:
+    path: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
+    state: absent
+  delegate_to: localhost
+  run_once: true
+  when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
+
+
 ##########
 
 - name: "APT: Purge undesired packages"
