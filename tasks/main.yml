@@ -23,8 +23,9 @@
     dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
     mode: "600"
   become: false
-  when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
   delegate_to: localhost
+  when: hostvars[item].ansible_facts['frr_version'].stdout|default("") == '8.4.4-1.1ubuntu6.3'
+  with_items: "{{ play_hosts }}"
   run_once: true
 
 - name: "Send patched FRR to remote"
@@ -45,7 +46,6 @@
     state: absent
   delegate_to: localhost
   become: false
-  run_once: true
   when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
 
 
