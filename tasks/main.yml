@@ -24,7 +24,7 @@
     mode: "600"
   become: false
   delegate_to: localhost
-  when: hostvars[item].ansible_facts['frr_version'].stdout|default("") == '8.4.4-1.1ubuntu6.3'
+  when: hostvars[item]['frr_version'].stdout|default("") == '8.4.4-1.1ubuntu6.3'
   with_items: "{{ play_hosts }}"
   run_once: true
 
