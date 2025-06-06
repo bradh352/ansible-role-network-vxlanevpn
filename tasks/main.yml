@@ -13,6 +13,7 @@
 # FRR 8.4.4 in Ubuntu 24.04 has an issue resolved by https://github.com/FRRouting/frr/pull/12524
 - name: "Check installed FRR version"
   shell: "dpkg -l frr | grep ii | awk '{ print $3 }'"
+  changed_when: false
   register: frr_version
   when: ansible_distribution == "Ubuntu"
 
