@@ -35,10 +35,12 @@ router bgp {{ network_underlay_asn }}
   bgp router-id {{ network_vtep_ip|split('/')|first }}
   bgp ebgp-requires-policy
   bgp log-neighbor-changes
-  ! Enable ECMP on multiple eBGP paths
-  bgp bestpath as-path multipath-relax
-  ! Don't install more than 2 paths for ECMP
-  maximum-paths 2
+  !
+  ! Disable ECMP for now to see if this resolves issues
+  !! Enable ECMP on multiple eBGP paths
+  ! bgp bestpath as-path multipath-relax
+  !! Don't install more than 2 paths for ECMP
+  ! maximum-paths 2
   !
   neighbor PEERS peer-group
   neighbor PEERS remote-as external
