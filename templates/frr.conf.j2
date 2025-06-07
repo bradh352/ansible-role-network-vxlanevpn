@@ -15,21 +15,17 @@ ip nht resolve-via-default
 !
 ipv6 nht resolve-via-default
 !
-! Export any IPs in lo as these are our VTEPs
-route-map EXPORT permit 1
-match interface lo
+ip prefix-list VTEP seq 1 permit {{ network_vtep_ip }} ge 32
 !
-! Redistribute prefixes learned via BGP
-route-map EXPORT permit 2
-  match large-community {{ network_underlay_asn }}:10:0
+route-map ALLOW_ALL permit 1
 !
-! Tag route learned through BGP
-route-map IMPORT permit 1
-  set large-community {{ network_underlay_asn }}:10:0
+route-map ALLOW_VTEP_AND_BGP permit 1
+ match ip address prefix-list VTEP
 !
-! Permit everything
-route-map PERMIT permit 1
+route-map ALLOW_VTEP_AND_BGP permit 2
+ match source-protocol bgp
 !
+route-map ALLOW_VTEP_AND_BGP deny 100
 !
 router bgp {{ network_underlay_asn }}
   bgp router-id {{ network_vtep_ip|split('/')|first }}
@@ -50,20 +46,20 @@ router bgp {{ network_underlay_asn }}
   !
   address-family ipv4 unicast
     neighbor PEERS activate
-    neighbor PEERS route-map IMPORT in
-    neighbor PEERS route-map EXPORT out
+    neighbor PEERS route-map ALLOW_ALL in
+    neighbor PEERS route-map ALLOW_VTEP_AND_BGP out
     redistribute connected
   !
   address-family ipv6 unicast
     neighbor PEERS activate
-    neighbor PEERS route-map IMPORT in
-    neighbor PEERS route-map EXPORT out
+    neighbor PEERS route-map ALLOW_ALL in
+    neighbor PEERS route-map ALLOW_VTEP_AND_BGP out
     redistribute connected
   !
   address-family l2vpn evpn
     neighbor PEERS activate
-    neighbor PEERS route-map PERMIT in
-    neighbor PEERS route-map PERMIT out
+    neighbor PEERS route-map ALLOW_ALL in
+    neighbor PEERS route-map ALLOW_ALL out
     neighbor PEERS attribute-unchanged next-hop
     autort rfc8365-compatible
     advertise-all-vni
