@@ -149,6 +149,9 @@
     value: "{{ item.val }}"
   with_items:
     - section: "Network"
+      key: "KeepConfiguration"
+      val: "yes"
+    - section: "Network"
       key: "ManageForeignNextHops"
       val: "no"
     - section: "Network"
