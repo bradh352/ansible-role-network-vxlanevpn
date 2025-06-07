@@ -12,7 +12,7 @@
 - name: networkctl_reload
   shell: networkctl reload
 
-- name: sysctl_reload
+- name: sysctl_restart
   service:
     name: systemd-sysctl
     state: restarted
