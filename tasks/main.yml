@@ -125,6 +125,13 @@
     state: started
     enabled: true
 
+- name: "Sysctl: Neeeded parameters for FRR"
+  copy:
+    src: sysctl_99-frr.conf
+    dest: /etc/sysctl.d/99-frr.conf
+    mode: "660"
+  notify: sysctl_restart
+
 # - name: "ifupdown-ng: write configuration"
 #   template:
 #     src: interfaces.j2
