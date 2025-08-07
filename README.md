@@ -51,8 +51,8 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
   * `vni`: VXLAN vni (`1` to `16777215`)
   * `mtu`: MTU. Must be at least 54 bytes less than `network_underlay_mtu`.
     Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
-  * `dhcp`: Default `false`. Set to true to use dhcp.  Cannot be used with
-    `addresses`.
+  * `dhcp`: Default `false`. Set to true to use dhcp.  (also enables ipv6 RA).
+    Cannot be used with `addresses`.
   * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
     used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
   * `routes`: List of routes.  If none specified will only be able to access
@@ -72,11 +72,12 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
   name as it does not support pattern, macaddr, or driver matching.
   * `ifname`: Known system interface name
   * `mtu`: MTU. Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
-  * `dhcp`: Default `false`. Set to true to use dhcp.  Cannot be used with
-    `addresses`.  **NOTE:** this will explicitly disable reception of routes
-    and DNS servers and is only used for ip address assignment in this context
-    due to the expectation that if DHCP is needed it will be part of the
-    VXLAN network.
+  * `dhcp`: Default `false`. Set to true to use dhcp (also enables ipv6 RA).
+    Cannot be used with `addresses`.
+  * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning
+    of things like routes (including default route), dns, and ntp.  The default
+    is false as there is an assumption this is a backdoor interface rather than
+    primary.
   * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
     used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
   * `routes`: List of routes.  If none specified will only be able to access

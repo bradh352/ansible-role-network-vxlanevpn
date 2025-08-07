@@ -17,56 +17,13 @@ network:
       optional: true
 {%   endfor %}
 {% endif %}
-{# Must create a bridge per vxlan #}
 {% if network_vxlan_interfaces|default([])|count > 0 %}
+{# Must create a bridge per vxlan. User-specified interface name is bridge name. #}
+{# We are assigning IPs, etc to the bridge itself instead of attaching a virtual interface. #}
   bridges:
-{%   for interface in network_vxlan_interfaces %}
-{# User-specified interface name is bridge name.  We are assigning IPs, etc to #}
-{# the bridge itself instead of attaching a virtual interface. #}
-    {{ interface.name }}:
-      dhcp4: no
-      dhcp6: no
-      accept-ra: no
-      interfaces:
-        - vxlan{{ interface.vni }}
-      link-local: [ ]
-      mtu: {{ interface.mtu|default(1500) }}
-{%     if interface.dhcp|default(false) %}
-      dhcp4: true
-      accept-ra: true
-{%     elif interface.addresses|default([])|count > 0 %}
-      dhcp4: false
-      dhcp6: false
-      accept-ra: false
-      optional: true
-      addresses:
-{%       for address in interface.addresses %}
-        - {{ address }}
-{%       endfor %}
-{%     endif %}
-{%     if interface.routes|default([])|count > 0 %}
-      routes:
-{%       for route in interface.routes %}
-        - to: {{ route.to }}
-          via: {{ route.via }}
-{%       endfor %}
-{%     endif %}
-{%     if interface.nameservers is defined %}
-      nameservers:
-{%       if interface.nameservers.addresses|default([])|count > 0 %}
-        addresses:
-{%         for address in interface.nameservers.addresses %}
-          - {{ address }}
-{%         endfor %}
-{%       endif %}
-{%     endif %}
-{%     if interface.nameservers.search|default([])|count > 0 %}
-        search:
-{%       for search in interface.nameservers.search %}
-          - {{ search }}
-{%       endfor %}
-{%     endif %}
-{%   endfor %}
+{%   with interfaces=network_vxlan_interfaces, is_vxlan_bridge=true, allow_dhcp_learning=true, allow_ipv6_ll=false %}
+{%     include "netplan.conf.interfaces.j2" %}
+{%   endwith %}
 {% endif %}
   ethernets:
     lo:
@@ -87,50 +44,6 @@ network:
       optional: true
 {% endfor %}
 {# User specified fallback interfaces, configure here #}
-{% for interface in network_interfaces|default([]) %}
-    {{ interface.ifname }}:
-      link-local: [ ipv6 ]
-      mtu: {{ interface.mtu|default(1500) }}
-{%   if interface.dhcp|default(false) %}
-      dhcp4: true
-      accept-ra: true
-      dhcp4-overrides:
-        use-dns: false
-        use-ntp: false
-        use-routes: false
-        use-domains: false
-      ra-overrides:
-        use-dns: false
-        use-domains: false
-{%   elif interface.addresses|default([])|count > 0 %}
-      dhcp4: false
-      dhcp6: false
-      accept-ra: false
-      addresses:
-{%     for address in interface.addresses %}
-        - {{ address }}
-{%     endfor %}
-{%   endif %}
-{%   if interface.routes|default([])|count > 0 %}
-      routes:
-{%     for route in interface.routes %}
-        - to: {{ route.to }}
-          via: {{ route.via }}
-{%     endfor %}
-{%   endif %}
-{%   if interface.nameservers is defined %}
-      nameservers:
-{%     if interface.nameservers.addresses|default([])|count > 0 %}
-        addresses:
-{%       for address in interface.nameservers.addresses %}
-          - {{ address }}
-{%       endfor %}
-{%     endif %}
-{%   endif %}
-{%   if interface.nameservers.search|default([])|count > 0 %}
-        search:
-{%     for search in interface.nameservers.search %}
-          - {{ search }}
-{%     endfor %}
-{%   endif %}
-{% endfor %}
+{% with interfaces=network_interfaces|default([]), is_vxlan_bridge=false, allow_dhcp_learning=false, allow_ipv6_ll=true %}
+{%   include "netplan.conf.interfaces.j2" %}
+{% endwith %}
