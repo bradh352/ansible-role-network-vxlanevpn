@@ -1,17 +1,16 @@
-{% if network_underlay_interfaces is not defined %}
-{{ notdefined | mandatory(msg='network_underlay_interfaces must be defined') }}
-{% endif %}
-{% set iface_list = [] %}
-{% for interface in network_underlay_interfaces %}
+{% macro resolve_ifnames(ansible_facts, interface) -%}
+{# This macro takes in a dictionary with one of ifname, macaddr, driver, or pattern specified #}
+{# and outputs an array of matching interface names #}
+{%   set iface_list = [] %}
 {%   if interface.ifname is defined %}
 {%     if not interface.ifname in ansible_facts.interfaces %}
 {{ notdefined | mandatory(msg='interface with ifname ' + interface.ifname + ' not found') }}
 {%     endif %}
-{%     do iface_list.append({ "ifname": interface.ifname } | combine(interface) ) %}
+{%     do iface_list.append(interface.ifname) %}
 {%   elif interface.macaddr is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if ansible_facts[host_iface].macaddress == interface.macaddr %}
-{%         do iface_list.append({ "ifname": host_iface} | combine(interface) ) %}
+{%         do iface_list.append(host_iface) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -20,7 +19,7 @@
 {%   elif interface.driver is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if ansible_facts[host_iface].module|default("") == interface.driver %}
-{%         do iface_list.append({ "ifname": host_iface} | combine(interface) ) %}
+{%         do iface_list.append(host_iface) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -29,12 +28,14 @@
 {%   elif interface.pattern is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if host_iface|regex_search(interface.pattern)|length > 0 %}
-{%         do iface_list.append({ "ifname": host_iface} | combine(interface) ) %}
+{%         do iface_list.append(host_iface) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
 {{ notdefined | mandatory(msg='interface with pattern ' + interface.pattern + ' not found') }}
 {%     endif %}
+{%   else %}
+{{ notdefined | mandatory(msg='interface must include one of ifname, macaddr, driver, or pattern') }}
 {%   endif %}
-{% endfor %}
-{{- iface_list | sort(attribute='ifname') -}}
+{{- iface_list -}}
+{% endmacro -%}

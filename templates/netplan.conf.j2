@@ -1,3 +1,4 @@
+{% import 'macros/ip_funcs.j2' as ipfn %}
 {% if network_vtep_ip is not defined %}
 {{ notdefined | mandatory(msg='network_vtep_ip must be defined') }}
 {% endif %}
@@ -34,14 +35,17 @@ network:
         - ::1/128
         - {{ network_vtep_ip|split('/')|first }}/32
 {# For each underlay interface, configure it, enable ipv6 link-local #}
-{% for interface in network_vxlanevpn_interfaces %}
-    {{ interface.ifname }}:
+{% for interface in network_underlay_interfaces %}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
+{%   for ifname in ifnames %}
+    {{ ifname }}:
       link-local: [ ipv6 ]
       mtu: {{ network_underlay_mtu|default(9100) }}
       dhcp4: false
       dhcp6: false
       accept-ra: false
       optional: true
+{%   endfor %}
 {% endfor %}
 {# User specified fallback interfaces, configure here #}
 {% with interfaces=network_interfaces|default([]), is_vxlan_bridge=false, allow_dhcp_learning=false, allow_ipv6_ll=true %}

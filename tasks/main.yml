@@ -60,14 +60,6 @@
     purge: true
     state: absent
 
-- name: "Gather interface mappings"
-  set_fact:
-    network_vxlanevpn_interfaces_json: "{{ lookup('template', 'resolve_vxlan_interfaces.j2') }}"
-
-- name: "Parse interface mappings"
-  set_fact:
-    network_vxlanevpn_interfaces: "{{ network_vxlanevpn_interfaces_json|from_yaml }}"
-
 - name: "FRR: enable bgp and bfd"
   lineinfile:
      path: /etc/frr/daemons
@@ -105,6 +97,10 @@
     dest: /etc/netplan/config.yaml
     mode: "600"
   register: netplan
+
+- name: "Fail, debug"
+  fail:
+    msg: "fail intentionally"
 
 - name: "NetPlan: make sure /etc/networkd-dispatcher/configuring.d/ exists"
   file:
