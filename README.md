@@ -29,7 +29,8 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
 * `network_underlay_interfaces`: Required. List of interfaces to use for the
   underlay network.  These are BGP unnumbered interfaces that cannot be used for
   any other purpose.  They must specify only ***one*** of the below options.
-    * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
+    * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  This is also
+      used if specifying a bond or vlan interface created by this role.
     * `pattern`: Regex pattern to match on interface name.  This can add more
       than one interface at a time. e.g. `ens.*`, `ens[23]`
     * `macaddr`: Mac address of interface
@@ -45,8 +46,9 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
 * `network_underlay_mtu`: MTU to use for all underlay interfaces.  Defaults
   to `9100` if not specified.  This must be at least 54 bytes greater than
   the largest `network_vxlan_interfaces` mtu.
-* `network_vxlan_interfaces`: List of virtual vxlan interfaces to create and
-  attach to the bridge.
+* `network_vxlan_interfaces`: List of virtual vxlan interfaces to create.  These
+  are similar to vlan interfaces when the host will be participating in the
+  vxlan, but are technically created as bridges.
   * `name`: Interface name to assign
   * `vni`: VXLAN vni (`1` to `16777215`)
   * `mtu`: MTU. Must be at least 54 bytes less than `network_underlay_mtu`.
@@ -106,6 +108,85 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
   * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
     `llrs`. Defaults to `auto` if link speed specified is less than `25000`
     otherwise defaults to `auto` (including if link speed not specifed).
+* `network_bonds`: Create LACP network bonds. Multiple interfaces may be
+   specified in a bond, and when using pattern matching or driver matching
+   those too may resolve to multiple interfaces.
+  * `name`: Interface name to assign for bond.
+  * `interfaces`: List of interfaces in the bond. Must specify one of `ifname`,
+    `pattern`, `macaddr`, or `driver` for interface matching.
+    * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
+    * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
+      Care must be taken not to match more than one interface or an error will
+      be thrown.
+    * `macaddr`: Mac address of interface
+    * `driver`: Driver module to match on. e.g. `mlx5_core`, `ixgbe`. Care must be
+      taken to not match more than one interface or an error will be thrown.
+    * `speed`: To set a specific speed in Mb/s, e.g. `10000`, `25000`, `100000`.
+      Defaults to whatever the NIC default is.
+    * `autonegotiation`: Boolean. Whether or not to enable autonegotiation.
+      Default is `true`.
+    * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
+      `llrs`. Defaults to `auto` if link speed specified is less than `25000`
+      otherwise defaults to `auto` (including if link speed not specifed).
+  * `mtu`: MTU. Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
+  * `dhcp`: Default `false`. Set to true to use dhcp (also enables ipv6 RA).
+    Cannot be used with `addresses`.
+  * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning
+    of things like routes (including default route), dns, and ntp.  The default
+    is false as there is an assumption this is a backdoor interface rather than
+    primary.
+  * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
+    used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
+  * `routes`: List of routes.  If none specified will only be able to access
+    other machines in the same subnet.  Typically not used with `dhcp`.
+    * `to`: Subnet to add route for.  Use `0.0.0.0/0` or `::/0` for default
+      route for ipv4 or ipv6, respectively.
+    * `via`: Gateway to use to access specified subnet. e.g. `10.23.45.1` or
+      `2600:1234::1`
+  * `nameservers`: Dictionary of values for DNS configuration. Typically not
+    used with `dhcp`.
+    * `addresses`: List of addresses for nameservers,
+      e.g. `8.8.8.8` or `2001:4860:4860::8888`
+    * `search`: List of search domains, e.g. `internal.example.com`
+* `network_brdiges`: Create a network bridge.  The bridge will have spanning
+  tree enabled.
+  * `name`: Interface name to assign for bond.
+  * `interfaces`: List of interfaces in the bridge. Must specify one of `ifname`,
+    `pattern`, `macaddr`, or `driver` for interface matching.
+    * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
+    * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
+      Care must be taken not to match more than one interface or an error will
+      be thrown.
+    * `macaddr`: Mac address of interface
+    * `driver`: Driver module to match on. e.g. `mlx5_core`, `ixgbe`. Care must be
+      taken to not match more than one interface or an error will be thrown.
+    * `speed`: To set a specific speed in Mb/s, e.g. `10000`, `25000`, `100000`.
+      Defaults to whatever the NIC default is.
+    * `autonegotiation`: Boolean. Whether or not to enable autonegotiation.
+      Default is `true`.
+    * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
+      `llrs`. Defaults to `auto` if link speed specified is less than `25000`
+      otherwise defaults to `auto` (including if link speed not specifed).
+  * `mtu`: MTU. Defaults to `9000`..
+  * `dhcp`: Default `false`. Set to true to use dhcp (also enables ipv6 RA).
+    Cannot be used with `addresses`.
+  * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning
+    of things like routes (including default route), dns, and ntp.  The default
+    is false as there is an assumption this is a backdoor interface rather than
+    primary.
+  * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
+    used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
+  * `routes`: List of routes.  If none specified will only be able to access
+    other machines in the same subnet.  Typically not used with `dhcp`.
+    * `to`: Subnet to add route for.  Use `0.0.0.0/0` or `::/0` for default
+      route for ipv4 or ipv6, respectively.
+    * `via`: Gateway to use to access specified subnet. e.g. `10.23.45.1` or
+      `2600:1234::1`
+  * `nameservers`: Dictionary of values for DNS configuration. Typically not
+    used with `dhcp`.
+    * `addresses`: List of addresses for nameservers,
+      e.g. `8.8.8.8` or `2001:4860:4860::8888`
+    * `search`: List of search domains, e.g. `internal.example.com`
 
 ***NOTE***: Typically variables will be placed in the host vars, it is
 recommended to create a file like `host_vars/host-fqdn.yml` that contains

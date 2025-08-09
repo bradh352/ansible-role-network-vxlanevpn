@@ -16,13 +16,27 @@ case "$IFACE" in
 {%   endfor %}
 {% endfor %}
 {# ------ BOND PHYSICAL ETHERNET INTERFACES ------ #}
-{% for interface in network_bonds|default([]) %}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
-{%   for ifname in ifnames %}
+{% for bond in network_bonds|default([]) %}
+{%   for interface in bond.interfaces %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface.interfaces) | from_yaml %}
+{%     for ifname in ifnames %}
     {{ ifname }})
       ethtool --set-fec {{ interface.ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
       ethtool -s {{ interface.ifname }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
+{%     endfor %}
+{%   endfor %}
+{% endfor %}
+{# ------ BRIDGE PHYSICAL ETHERNET INTERFACES ------ #}
+{% for bridge in network_bridges|default([]) %}
+{%   for interface in bridge.interfaces %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface.interfaces) | from_yaml %}
+{%     for ifname in ifnames %}
+    {{ ifname }})
+      ethtool --set-fec {{ interface.ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
+      ethtool -s {{ interface.ifname }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
+      ;;
+{%     endfor %}
 {%   endfor %}
 {% endfor %}
 {# ------ PHYSICAL ETHERNET INTERFACES ------ #}

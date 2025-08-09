@@ -1,11 +1,13 @@
 {% if network_bonds|default([])|count > 0 %}
   bonds:
 {%   for interface in network_bonds %}
-{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
     {{ interface.name }}:
       interfaces:
-{%     for ifname in ifnames %}
+{%     for phy_interface in interface.interfaces %}
+{%       set ifnames = ipfn.resolve_ifnames(ansible_facts, phy_interface) | from_yaml %}
+{%       for ifname in ifnames %}
         - {{ ifname }}
+{%       endfor %}
 {%     endfor %}
       link-local: [ ipv6 ]
       mtu: {{ interface.mtu|default(1500) }}
