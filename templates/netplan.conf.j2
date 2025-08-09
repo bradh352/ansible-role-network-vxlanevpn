@@ -1,31 +1,14 @@
 {% import 'macros/ip_funcs.j2' as ipfn %}
+{% set bond_ifnames = network_bonds|default([]) | map(attribute='name') | list %}
+{% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
 {% if network_vtep_ip is not defined %}
 {{ notdefined | mandatory(msg='network_vtep_ip must be defined') }}
 {% endif %}
 network:
   version: 2
-{# Create the VXLAN Tunnels for each one the host uses in form of vxlan{{ vni }} #}
-{% if network_vxlan_interfaces|default([])|count > 0 %}
-  tunnels:
-{%   for interface in network_vxlan_interfaces %}
-    vxlan{{ interface.vni }}:
-      mode: vxlan
-      local: {{ network_vtep_ip|split('/')|first }}
-      id: {{ interface.vni }}
-      mtu: {{ interface.mtu|default(1500) }}
-      mac-learning: false
-      port: 4789
-      optional: true
-{%   endfor %}
-{% endif %}
-{% if network_vxlan_interfaces|default([])|count > 0 %}
-{# Must create a bridge per vxlan. User-specified interface name is bridge name. #}
-{# We are assigning IPs, etc to the bridge itself instead of attaching a virtual interface. #}
-  bridges:
-{%   with interfaces=network_vxlan_interfaces, is_vxlan_bridge=true, allow_dhcp_learning=true, allow_ipv6_ll=false %}
-{%     include "netplan.conf.interfaces.j2" %}
-{%   endwith %}
-{% endif %}
+{% include "netplan.conf.tunnels.j2" -%}
+{% include "netplan.conf.bonds.j2" -%}
+{% include "netplan.conf.bridges.j2" -%}
   ethernets:
     lo:
       match:
@@ -34,20 +17,4 @@ network:
         - 127.0.0.1/8
         - ::1/128
         - {{ network_vtep_ip|split('/')|first }}/32
-{# For each underlay interface, configure it, enable ipv6 link-local #}
-{% for interface in network_underlay_interfaces %}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
-{%   for ifname in ifnames %}
-    {{ ifname }}:
-      link-local: [ ipv6 ]
-      mtu: {{ network_underlay_mtu|default(9100) }}
-      dhcp4: false
-      dhcp6: false
-      accept-ra: false
-      optional: true
-{%   endfor %}
-{% endfor %}
-{# User specified fallback interfaces, configure here #}
-{% with interfaces=network_interfaces|default([]), is_vxlan_bridge=false, allow_dhcp_learning=false, allow_ipv6_ll=true %}
-{%   include "netplan.conf.interfaces.j2" %}
-{% endwith %}
+{% include "netplan.conf.phy.j2" -%}

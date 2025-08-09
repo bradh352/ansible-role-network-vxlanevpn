@@ -1,0 +1,14 @@
+{% if network_vxlan_interfaces|default([])|count > 0 or network_bridges|default([])|count > 0 %}
+  bridges:
+{# Must create a bridge per vxlan. User-specified interface name is bridge name. #}
+{# We are assigning IPs, etc to the bridge itself instead of attaching a virtual interface. #}
+{%   for interface in network_vxlan_interfaces %}
+    {{ interface.name }}:
+      interfaces:
+        - vxlan{{ interface.vni }}
+      link-local: [ ]
+{%     with allow_dhcp_learning=true %}
+{%       include "netplan.conf.ip.j2" %}
+{%     endwith %}
+{%   endfor %}
+{% endif %}

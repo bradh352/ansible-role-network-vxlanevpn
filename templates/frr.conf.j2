@@ -1,3 +1,4 @@
+{% import 'macros/ip_funcs.j2' as ipfn %}
 service integrated-vtysh-config
 hostname {{ inventory_hostname }}
 !
@@ -65,7 +66,12 @@ router bgp {{ network_underlay_asn }}
     advertise-all-vni
     advertise-svi-ip
   !
-{% for interface in network_vxlanevpn_interfaces %}
-  neighbor {{ interface.ifname }} interface peer-group PEERS
+{% set bond_ifnames = network_bonds|default([]) | map(attribute='name') | list %}
+{% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
+{% for interface in network_underlay_interfaces %}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, bond_ifnames + bridge_ifnames) | from_yaml %}
+{%   for ifname in ifnames %}
+  neighbor {{ ifname }} interface peer-group PEERS
+{%   endfor %}
 {% endfor %}
 !

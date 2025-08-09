@@ -1,15 +1,15 @@
-{% macro resolve_ifnames(ansible_facts, interface) -%}
+{% macro resolve_ifnames(ansible_facts, interface, extra_ifnames=[]) -%}
 {# This macro takes in a dictionary with one of ifname, macaddr, driver, or pattern specified #}
 {# and outputs an array of matching interface names #}
 {%   set iface_list = [] %}
 {%   if interface.ifname is defined %}
-{%     if not interface.ifname in ansible_facts.interfaces %}
-{{ notdefined | mandatory(msg='interface with ifname ' + interface.ifname + ' not found') }}
+{%     if not interface.ifname in ansible_facts.interfaces and not interface.ifname in extra_ifnames %}
+{{ notdefined | mandatory(msg='interface, bond, or bridge with ifname ' + interface.ifname + ' not found') }}
 {%     endif %}
 {%     do iface_list.append(interface.ifname) %}
 {%   elif interface.macaddr is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
-{%       if ansible_facts[host_iface].macaddress == interface.macaddr %}
+{%       if ansible_facts[host_iface].macaddress|default("") == interface.macaddr %}
 {%         do iface_list.append(host_iface) %}
 {%       endif %}
 {%     endfor %}

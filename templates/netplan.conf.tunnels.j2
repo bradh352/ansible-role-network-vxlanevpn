@@ -1,0 +1,14 @@
+{# Create the VXLAN Tunnels for each one the host uses in form of vxlan{{ vni }} #}
+{% if network_vxlan_interfaces|default([])|count > 0 %}
+  tunnels:
+{%   for interface in network_vxlan_interfaces %}
+    vxlan{{ interface.vni }}:
+      mode: vxlan
+      local: {{ network_vtep_ip|split('/')|first }}
+      id: {{ interface.vni }}
+      mtu: {{ interface.mtu|default(1500) }}
+      mac-learning: false
+      port: 4789
+      optional: true
+{%   endfor %}
+{% endif %}

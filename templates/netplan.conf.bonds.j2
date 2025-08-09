@@ -1,0 +1,18 @@
+{% if network_bonds|default([])|count > 0 %}
+  bonds:
+{%   for interface in network_bonds %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
+    {{ interface.name }}:
+      interfaces:
+{%     for ifname in ifnames %}
+        - {{ ifname }}
+{%     endfor %}
+      link-local: [ ipv6 ]
+      mtu: {{ interface.mtu|default(1500) }}
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+{%     include "netplan.conf.ip.j2" %}
+{%   endfor %}
+{% endif %}

@@ -1,0 +1,48 @@
+{# Variables required: #}
+{#   - interface: dictionary containing ip and dns settings #}
+{#   - allow_dhcp_learning: boolean, whether or not dhcp learning of routes, dns, ntp are allowed. default false #}
+{% if interface.dhcp|default(false) %}
+      dhcp4: true
+      accept-ra: true
+{%   if not interface.dhcp_allow_learning|default(allow_dhcp_learning|default(false)) %}
+      dhcp4-overrides:
+        use-dns: false
+        use-ntp: false
+        use-routes: false
+        use-domains: false
+      ra-overrides:
+        use-dns: false
+        use-domains: false
+{%   endif %}
+{% elif interface.addresses|default([])|count > 0 %}
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+      optional: true
+      addresses:
+{%   for address in interface.addresses %}
+        - {{ address }}
+{%   endfor %}
+{% endif %}
+{% if interface.routes|default([])|count > 0 %}
+      routes:
+{%   for route in interface.routes %}
+        - to: {{ route.to }}
+          via: {{ route.via }}
+{%   endfor %}
+{% endif %}
+{% if interface.nameservers is defined %}
+      nameservers:
+{%   if interface.nameservers.addresses|default([])|count > 0 %}
+        addresses:
+{%     for address in interface.nameservers.addresses %}
+          - {{ address }}
+{%     endfor %}
+{%   endif %}
+{% endif %}
+{% if interface.nameservers.search|default([])|count > 0 %}
+        search:
+{%   for search in interface.nameservers.search %}
+          - {{ search }}
+{%   endfor %}
+{% endif %}

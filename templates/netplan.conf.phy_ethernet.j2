@@ -1,0 +1,12 @@
+{% for interface in network_interfaces|default([]) %}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
+{%   if ifnames|length > 1 %}
+{{ notdefined | mandatory(msg='interface matched more than 1 name') }}
+{%   endif %}
+    {{ interface.name|default(ifnames[0]) }}:
+      match:
+        name: {{ ifnames[0] }}
+      link-local: [ ipv6 ]
+      mtu: {{ interface.mtu|default(1500) }}
+{%   include "netplan.conf.ip.j2" %}
+{% endfor %}

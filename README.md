@@ -68,9 +68,17 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
 * `network_interfaces`: These are interfaces which do not participate in the
   vxlan, perhaps for something like backdoor access.  Most deployments may
   not utilize this configuration at all. It uses the same format as
-  `network_vxlan_interfaces` and requires the caller to know the interface
-  name as it does not support pattern, macaddr, or driver matching.
-  * `ifname`: Known system interface name
+  `network_vxlan_interfaces`, must specify one of `ifname`, `pattern`,
+  `macaddr`, or `driver` for interface matching.
+  * `name`: Interface name to assign. Optional, will keep system name if not
+    specified.
+  * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
+  * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
+    Care must be taken not to match more than one interface or an error will
+    be thrown.
+  * `macaddr`: Mac address of interface
+  * `driver`: Driver module to match on. e.g. `mlx5_core`, `ixgbe`. Care must be
+    taken to not match more than one interface or an error will be thrown.
   * `mtu`: MTU. Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
   * `dhcp`: Default `false`. Set to true to use dhcp (also enables ipv6 RA).
     Cannot be used with `addresses`.
