@@ -43,6 +43,25 @@ router bgp {{ network_underlay_asn }}
   neighbor PEERS advertisement-interval 5
   neighbor PEERS bfd
   neighbor PEERS capability extended-nexthop
+  {%if "hv101" in inventory_hostname %}
+  neighbor vlan101 interface peer-group PEERS
+  neighbor vlan102 interface peer-group PEERS
+  neighbor vlan103 interface peer-group PEERS
+  neighbor vlan104 interface peer-group PEERS
+  {% endif %}
+  {%if "hv102" in inventory_hostname %}
+  neighbor vlan101 interface peer-group PEERS
+  neighbor vlan102 interface peer-group PEERS
+  neighbor vlan105 interface peer-group PEERS
+  neighbor vlan106 interface peer-group PEERS
+  {% endif %}
+  {%if "hv103" in inventory_hostname %}
+  neighbor vlan103 interface peer-group PEERS
+  neighbor vlan104 interface peer-group PEERS
+  neighbor vlan105 interface peer-group PEERS
+  neighbor vlan106 interface peer-group PEERS
+  {% endif %}
+  !
   !
   address-family ipv4 unicast
     neighbor PEERS activate
@@ -65,7 +84,3 @@ router bgp {{ network_underlay_asn }}
     advertise-all-vni
     advertise-svi-ip
   !
-{% for interface in network_vxlanevpn_interfaces %}
-  neighbor {{ interface.ifname }} interface peer-group PEERS
-{% endfor %}
-!

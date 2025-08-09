@@ -93,16 +93,16 @@
       - "config.yaml"
   register: netplan_files
 
-- name: Delete unused netplan configuration
-  file:
-    path: "{{ item.path }}"
-    state: absent
-  with_items: "{{ netplan_files['files'] }}"
+# - name: Delete unused netplan configuration
+#   file:
+#     path: "{{ item.path }}"
+#     state: absent
+#   with_items: "{{ netplan_files['files'] }}"
 
 - name: "NetPlan: write configuration"
   template:
     src: netplan.conf.j2
-    dest: /etc/netplan/config.yaml
+    dest: /etc/netplan/52-network_vxlanevpn_config.yaml
     mode: "600"
   register: netplan
 
