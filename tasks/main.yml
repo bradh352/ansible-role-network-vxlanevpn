@@ -98,10 +98,6 @@
     mode: "600"
   register: netplan
 
-- name: "Fail, debug"
-  fail:
-    msg: "fail intentionally"
-
 - name: "NetPlan: make sure /etc/networkd-dispatcher/configuring.d/ exists"
   file:
     path: /etc/networkd-dispatcher/configuring.d/
@@ -127,13 +123,6 @@
     dest: /etc/sysctl.d/99-frr.conf
     mode: "660"
   notify: sysctl_restart
-
-# - name: "ifupdown-ng: write configuration"
-#   template:
-#     src: interfaces.j2
-#     dest: /etc/network/interfaces
-#     mode: "600"
-#   register: interfaces
 
 - name: "FRR: write configuration"
   template:
@@ -200,21 +189,6 @@
     name: ufw
     state: started
     enabled: true
-
-# - name: "Disable systemd-networkd"
-#   service:
-#     name: systemd-networkd-wait-online
-#     enabled: false
-
-# - name: "Mask systemd-networkd-wait-online"
-#   ansible.builtin.systemd_service:
-#     name: systemd-networkd-wait-online
-#     masked: true
-
-# - name: "Enable ifupdown2-ng networking"
-#   service:
-#     name: networking
-#     enabled: true
 
 - name: "VXLAN configuration changed, rebooting...(one node at a time)"
   reboot:

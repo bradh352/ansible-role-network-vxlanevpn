@@ -37,5 +37,5 @@
 {%   else %}
 {{ notdefined | mandatory(msg='interface must include one of ifname, macaddr, driver, or pattern') }}
 {%   endif %}
-{{- iface_list -}}
+{{- iface_list | sort -}}
 {% endmacro -%}

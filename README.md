@@ -67,13 +67,10 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
     * `addresses`: List of addresses for nameservers,
       e.g. `8.8.8.8` or `2001:4860:4860::8888`
     * `search`: List of search domains, e.g. `internal.example.com`
-* `network_interfaces`: These are interfaces which do not participate in the
-  vxlan, perhaps for something like backdoor access.  Most deployments may
-  not utilize this configuration at all. It uses the same format as
+* `network_interfaces`: These are interfaces which do not participate in vxlan,
+  bond, or bridge networks. It uses the same format as
   `network_vxlan_interfaces`, must specify one of `ifname`, `pattern`,
   `macaddr`, or `driver` for interface matching.
-  * `name`: Interface name to assign. Optional, will keep system name if not
-    specified.
   * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
   * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
     Care must be taken not to match more than one interface or an error will

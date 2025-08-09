@@ -6,9 +6,9 @@
 {% endif %}
 network:
   version: 2
-{% include "netplan.conf.tunnels.j2" -%}
-{% include "netplan.conf.bonds.j2" -%}
-{% include "netplan.conf.bridges.j2" -%}
+{% include "netplan.conf.tunnels.j2" %}
+{% include "netplan.conf.bonds.j2" %}
+{% include "netplan.conf.bridges.j2" %}
   ethernets:
     lo:
       match:
