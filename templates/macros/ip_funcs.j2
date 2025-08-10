@@ -1,9 +1,9 @@
-{% macro resolve_ifnames(ansible_facts, interface, extra_ifnames=[]) -%}
+{% macro resolve_ifnames(ansible_facts, interface, extra_ifnames=[], validate_ifname=true) -%}
 {# This macro takes in a dictionary with one of ifname, macaddr, driver, or pattern specified #}
 {# and outputs an array of matching interface names #}
 {%   set iface_list = [] %}
 {%   if interface.ifname is defined %}
-{%     if not interface.ifname in ansible_facts.interfaces and not interface.ifname in extra_ifnames %}
+{%     if not interface.ifname in ansible_facts.interfaces and not interface.ifname in extra_ifnames and validate_ifname %}
 {{ notdefined | mandatory(msg='interface, bond, or bridge with ifname ' + interface.ifname + ' not found') }}
 {%     endif %}
 {%     do iface_list.append(interface.ifname) %}

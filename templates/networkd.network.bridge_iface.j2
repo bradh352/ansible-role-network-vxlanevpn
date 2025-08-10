@@ -1,0 +1,12 @@
+{# Requires variables: #}
+{#   - config: general configuration for bridge #}
+{#   - interface: specific interface #}
+{% if interface.ifname | default("") in network_bond_names %}
+[Match]
+Name={{ interface.ifname }}
+{% else %}
+{% include "networkd.match.j2" %}
+{% endif %}
+
+[Network]
+Bridge={{ config.name }}

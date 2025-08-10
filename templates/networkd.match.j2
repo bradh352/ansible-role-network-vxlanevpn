@@ -1,0 +1,14 @@
+[Match]
+Type=ether
+{% if interface.ifname is defined %}
+OriginalName={{ interface.ifname }}
+{% elif item.interface.pattern is defined %}
+OriginalName={{ interface.pattern }}
+{% else %}
+OriginalName=*
+{%  if interface.macaddr is defined %}
+MACAddress={{ interface.macaddr }}
+{%  elif interface.driver is defined %}
+Driver={{ interface.driver }}
+{%  endif %}
+{% endif %}

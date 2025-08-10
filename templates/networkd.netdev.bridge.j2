@@ -1,0 +1,22 @@
+{# Requires variables: #}
+{#   - config: general configuration for bridge #}
+[NetDev]
+Name={{ config.name }}
+Kind=bridge
+
+[Bridge]
+{% if config.vlan_aware|default(true) %}
+VLANFiltering=yes
+DefaultPVID={{ config.pvid if config.pvid is defined else 'none' }}
+VLANProtocol=802.1q
+{% else %}
+VLANFiltering=no
+{% endif %}
+{% if config.stp|default(true) %}
+STP=yes
+ForwardDelaySec=4
+HelloTimeSec=1
+MaxAgeSec=10
+{% else %}
+STP=no
+{% endif %}

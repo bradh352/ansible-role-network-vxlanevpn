@@ -7,6 +7,7 @@
       - networkd-dispatcher
       - frr
       - ufw
+      - bridge-utils
     state: present
 
 ########## FRR Fixes
@@ -76,6 +77,203 @@
 # Flush handlers as frr_restart can interrupt.
 - name: "Flush handlers"
   ansible.builtin.meta: flush_handlers
+
+- name: "Validate configuration"
+  set_fact:
+    validate_interfaces: "{{ lookup('template', 'validate_config.j2') }}"
+
+- name: "Cache bond names"
+  set_fact:
+    network_bond_names: "{{ network_bonds|default([]) | map(attribute='name') | list }}"
+
+- name: "Networkd: Link: ethernet interfaces"
+  template:
+    src: "networkd.link.j2"
+    dest: "/etc/systemd/network/10-eth-{{ interface.name|default(interface.ifname) }}.link"
+  vars:
+    interface: "{{ item }}"
+    config: "{{ item }}"
+    defaultmtu: 1500
+  with_items: "{{ network_interfaces }}"
+  when: network_interfaces is defined
+
+- name: "Networkd: Link: underlay interfaces"
+  template:
+    src: "networkd.link.j2"
+    dest: "/etc/systemd/network/10-underlay-iface{{ index }}.link"
+  vars:
+    interface: "{{ item }}"
+    config: "{{ item }}"
+    defaultmtu: 9100
+  loop: "{{ network_underlay_interfaces }}"
+  loop_control:
+    index_var: index
+  when: network_underlay_interfaces is defined
+
+- name: "Networkd: Link: bridge interfaces"
+  template:
+    src: "networkd.link.j2"
+    dest: "/etc/systemd/network/10-bridge-{{ config.name }}-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}.link"
+  vars:
+    interface: "{{ item.interface }}"
+    config: "{{ item.config }}"
+    index: "{{ item.iface_index }}"
+    defaultmtu: "{{ item.config.mtu|default(9000) }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for bridge in network_bridges %}
+      {%-   for interface in bridge.interfaces %}
+      {%-     if interface.ifname|default("") not in network_bond_names %}
+      {%-       do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
+      {%-     endif %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_bridges is defined
+
+- name: "Networkd: Link: bond interfaces"
+  template:
+    src: "networkd.link.j2"
+    dest: "/etc/systemd/network/10-bond-{{ config.name }}-iface{{ index }}.link"
+  vars:
+    interface: "{{ item.interface }}"
+    config: "{{ item.config }}"
+    index: "{{ item.iface_index }}"
+    defaultmtu: "{{ item.config.mtu|default(9000) }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for bond in network_bonds %}
+      {%-   for interface in bond.interfaces %}
+      {%-     do items.append({ 'interface': interface, 'config': bond, 'iface_index': loop.index0 }) %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_bonds is defined
+
+- name: "Networkd: NetDev: bonds"
+  template:
+    src: "networkd.netdev.bond.j2"
+    dest: "/etc/systemd/network/20-bond-{{ config.name }}.netdev"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_bonds }}"
+  when: network_bonds is defined
+
+- name: "Networkd: NetDev: bridges"
+  template:
+    src: "networkd.netdev.bridge.j2"
+    dest: "/etc/systemd/network/30-bridge-{{ config.name }}.netdev"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_bridges }}"
+  when: network_bridges is defined
+
+- name: "Networkd: NetDev: vlan"
+  template:
+    src: "networkd.netdev.vlan.j2"
+    dest: "/etc/systemd/network/40-vlan-{{ config.name }}.netdev"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_vlans }}"
+  when: network_vlans is defined
+
+- name: "Networkd: NetDev: vxlan"
+  template:
+    src: "networkd.netdev.vxlan.j2"
+    dest: "/etc/systemd/network/40-vxlan{{ config.vni }}.netdev"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_vxlan_interfaces }}"
+  when: network_vxlan_interfaces is defined
+
+- name: "Networkd: Network: vxlan"
+  template:
+    src: "networkd.network.vxlan.j2"
+    dest: "/etc/systemd/network/50-bridge-{{ config.bridge }}-vxlan{{ config.vni }}{{ '-vlan' ~ config.vlan if config.vlan is defined else '' }}.network"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_vxlan_interfaces }}"
+  when: network_vxlan_interfaces is defined
+
+- name: "Networkd: Network: eth"
+  template:
+    src: "networkd.network.j2"
+    dest: "/etc/systemd/network/10-eth-{{ config.name|default(config.ifname) }}.network"
+  vars:
+    config: "{{ item }}"
+    type: "eth"
+  loop: "{{ network_interfaces }}"
+  when: network_interfaces is defined
+
+- name: "Networkd: Network: bond iface"
+  template:
+    src: "networkd.network.bond_iface.j2"
+    dest: "/etc/systemd/network/40-bond-{{ config.name }}-iface{{ index }}.network"
+  vars:
+    config: "{{ item.config }}"
+    interface: "{{ item.interface }}"
+    index: "{{ item.iface_index }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for bond in network_bonds %}
+      {%-   for interface in bond.interfaces %}
+      {%-     do items.append({ 'interface': interface, 'config': bond, 'iface_index': loop.index0 }) %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_bonds is defined
+
+- name: "Networkd: Network: bridge iface"
+  template:
+    src: "networkd.network.bridge_iface.j2"
+    dest: "/etc/systemd/network/50-bridge-{{ config.name }}-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}.network"
+  vars:
+    config: "{{ item.config }}"
+    interface: "{{ item.interface }}"
+    index: "{{ item.iface_index }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for bridge in network_bridges %}
+      {%-   for interface in bridge.interfaces %}
+      {%-     do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_bridges is defined
+
+- name: "Networkd: Network: vlans"
+  template:
+    src: "networkd.network.j2"
+    dest: "/etc/systemd/network/60-vlan-{{ config.name }}.network"
+  vars:
+    config: "{{ item }}"
+    type: "vlan"
+  loop: "{{ network_vlans }}"
+  when: network_vlans is defined
+
+- name: "Networkd: Network: bonds"
+  template:
+    src: "networkd.network.j2"
+    dest: "/etc/systemd/network/60-bond-{{ config.name }}.network"
+  vars:
+    config: "{{ item }}"
+    type: "bond"
+  loop: "{{ network_bonds }}"
+  when: network_bonds is defined
+
+- name: "Networkd: Network: bridge"
+  template:
+    src: "networkd.network.j2"
+    dest: "/etc/systemd/network/60-bridge-{{ config.name }}.network"
+  vars:
+    config: "{{ item }}"
+    type: "bridge"
+  loop: "{{ network_bridges }}"
+  when: network_bridges is defined
+
+- name: "Debug: fail here"
+  fail:
+    msg: "Intentionally fail"
 
 - name: Find interfaces configuration
   find:

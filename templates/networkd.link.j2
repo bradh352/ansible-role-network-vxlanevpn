@@ -1,0 +1,18 @@
+{# Requires variables: #}
+{#   - interface: dictionary of interface configuration attributes #}
+{#   - config: general configuration for bond, bridge or interface #}
+{#   - defaultmtu: default MTU size to use if not specified #}
+{% include "networkd.match.j2" %}
+
+[Link]
+{# Name should only exist for network_interfaces, not bridges or bonds #}
+{% if interface.name is defined %}
+Name={{ interface.name }}
+{% endif %}
+WakeOnLan=off
+MTUBytes={{ config.mtu|default(defaultmtu) }}
+{% if interface.speed is defined %}
+BitsPerSecond={{ interface.speed }}
+{% endif %}
+Duplex=Full
+AutoNegotiation={{ 'yes' if interface.autonegotiation|default(true) else 'no' }}

@@ -1,0 +1,14 @@
+{# Requires variables: #}
+{#   - config: general configuration for vxlan interface #}
+{#   - network_vtep_ip: ip/netmask of vtep #}
+[NetDev]
+Name=vxlan{{ config.vni }}
+MTUBytes={{ config.mtu | default(1500) }}
+Kind=vxlan
+
+[VXLAN]
+VNI={{ config.vni }}
+Local={{ network_vtep_ip|split('/')|first }}
+MacLearning=false
+DestinationPort=4789
+Independent=true

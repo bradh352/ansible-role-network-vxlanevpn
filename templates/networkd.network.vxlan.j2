@@ -1,0 +1,22 @@
+{# Requires variables: #}
+{#   - config: general configuration for vxlan interface #}
+{#   - network_bridges: configuration for network bridges #}
+[Match]
+Name=vxlan{{ config.vni }}
+
+[Network]
+{% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
+{% if config.bridge not in bridge_ifnames %}
+{{ notdefined | mandatory(msg='vxlan ' ~ config.name ~ ' (vni ' ~ config.vni ~ '): bridge ' ~ config.bridge ~ 'not found') }}
+{% endif %}
+Bridge={{ config.bridge }}
+{% set vlan_aware = network_bridges | selectattr('name', 'equalto', config.bridge) | map(attribute='vlan_aware') | list | first | default(true) %}
+{% if vlan_aware %}
+{%   if config.vlan is defined %}
+[BridgeVLAN]
+PVID={{ config.vlan }}
+EgressUntagged={{ config.vlan }}
+{%   else %}
+{{ notdefined | mandatory(msg='vxlan=' ~ config.name ~ ', vni=' ~ config.vni ~ ', bridge=' ~ config.bridge ~ ': bridge is vlan aware but vlan not defined for vxlan') }}
+{%   endif %}
+{% endif %}

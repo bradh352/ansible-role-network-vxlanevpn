@@ -1,0 +1,9 @@
+{# Requires variables: #}
+{#   - config: general configuration for vlan interface #}
+[NetDev]
+Name={{ config.name }}
+MTUBytes={{ config.mtu | default(1500) }}
+Kind=vlan
+
+[VLAN]
+ID={{ config.vlan }}

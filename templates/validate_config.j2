@@ -1,0 +1,42 @@
+{% import 'macros/ip_funcs.j2' as ipfn %}
+{# ----- Collect all known interface names from configuration ---- #}
+{% set bond_ifnames = network_bonds|default([]) | map(attribute='name') | list %}
+{% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
+{% set ether_ifnames = [] %}
+{# Handle the possibility that the the configuration is renaming an interface #}
+{% for interface in network_interfaces|default([]) %}
+{%   if interface.name is not defined and interface.ifname is not defined %}
+{{ notdefined | mandatory(msg='network_interfaces entry must have name if not using ifname') }}
+{%   endif %}
+{%   do ether_ifnames.append(interface.name|default(interface.ifname)) %}
+{% endfor %}
+{% set all_ifnames = bond_ifnames + bridge_ifnames + ether_ifnames %}
+{# ----- Validate underlay interface names ---- #}
+BGP Unnumbered Underlay Interfaces:
+{% for interface in network_underlay_interfaces|default([]) %}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=all_ifnames) %}
+iface {{ loop.index }}: {{ ifnames }}
+{% endfor %}
+{# ----- Validate bond interface names ---- #}
+Bond Interfaces:
+{% for bond in network_bonds|default([]) %}
+{%   for interface in bond.interfaces %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) %}
+{{ bond.name }}.{{ loop.index0 }}: {{ ifnames }}
+{%   endfor %}
+{% endfor %}
+{# ----- Validate bridge interface names ---- #}
+Bridge Interfaces:
+{% for bridge in network_bridges|default([]) %}
+{%   for interface in bridge.interfaces %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=bond_ifnames) %}
+{{ bridge.name }}.{{ loop.index0 }}: {{ ifnames }}
+{%   endfor %}
+{% endfor %}
+{# ----- Validate ethernet interface names ---- #}
+Ethernet Interfaces:
+{% for interface in network_interfaces|default([]) %}
+{# We can't guarantee the ifname exists if the user is renaming the interface, so turn off ifname validation #}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, validate_ifname=false) %}
+{{ interface.name|default(interface.ifname) }}: {{ ifnames }}
+{% endfor %}

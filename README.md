@@ -50,7 +50,9 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
   are similar to vlan interfaces when the host will be participating in the
   vxlan, but are technically created as bridges.
   * `name`: Interface name to assign
-  * `vni`: VXLAN vni (`1` to `16777215`)
+  * `vni`: VXLAN vni (`1` to `16777215`). Required.
+  * `bridge`: Bridge to attach vlan to. Required.
+  * `vlan`: VLAN to assign to local bridge. Required if bridge is vlan aware.
   * `mtu`: MTU. Must be at least 54 bytes less than `network_underlay_mtu`.
     Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
   * `dhcp`: Default `false`. Set to true to use dhcp.  (also enables ipv6 RA).
@@ -71,6 +73,8 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
   bond, or bridge networks. It uses the same format as
   `network_vxlan_interfaces`, must specify one of `ifname`, `pattern`,
   `macaddr`, or `driver` for interface matching.
+  * `name`: Name to assign network interface.  Must be specified if not using
+    `ifname`.
   * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
   * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
     Care must be taken not to match more than one interface or an error will
@@ -145,12 +149,13 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
     * `addresses`: List of addresses for nameservers,
       e.g. `8.8.8.8` or `2001:4860:4860::8888`
     * `search`: List of search domains, e.g. `internal.example.com`
-* `network_brdiges`: Create a network bridge.  The bridge will have spanning
+* `network_bridges`: Create a network bridge.  The bridge will have spanning
   tree enabled.
   * `name`: Interface name to assign for bond.
   * `interfaces`: List of interfaces in the bridge. Must specify one of `ifname`,
     `pattern`, `macaddr`, or `driver` for interface matching.
-    * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
+    * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  May also
+      include the name of a bond created.
     * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
       Care must be taken not to match more than one interface or an error will
       be thrown.
@@ -164,7 +169,11 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
     * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
       `llrs`. Defaults to `auto` if link speed specified is less than `25000`
       otherwise defaults to `auto` (including if link speed not specifed).
-  * `mtu`: MTU. Defaults to `9000`..
+  * `stp`: Boolean. Whether or not to enable Spanning Tree Protocol. Default `true`.
+  * `vlan_aware`: Boolean. Whether or not the bridge is VLAN aware. Default `true`.
+  * `pvid`: When `vlan_aware`, this is the default vlan id.  Required if
+    assigning IP addresses to bridge directly.  Default is unset.
+  * `mtu`: MTU. Defaults to `9000`.
   * `dhcp`: Default `false`. Set to true to use dhcp (also enables ipv6 RA).
     Cannot be used with `addresses`.
   * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning

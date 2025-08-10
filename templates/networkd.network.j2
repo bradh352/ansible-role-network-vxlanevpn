@@ -1,0 +1,57 @@
+{# General network configuration.  Depends on these variables: #}
+{#  - config: dictionary containing configuration #}
+{#  - type: eth, bond, vlan, or bridge #}
+[Match]
+{% if type == "eth" %}
+Name={{ config.name|default(config.ifname) }}
+{% else %}
+Name={{ config.name }}
+{% endif %}
+
+[Link]
+MTUBytes={{ config.mtu | default(9000 if type == "bridge" else 1500) }}
+
+[Network]
+{% if type == "vlan" %}
+Bridge={{ config.bridge }}
+{% endif %}
+KeepConfiguration=yes
+LinkLocalAddressing=ipv6
+{% if config.dhcp|default(false) %}
+IPv6AcceptRA=yes
+DHCP=ipv4
+{% else %}
+IPv6AcceptRA=no
+DHCP=no
+{%   for address in config.addresses|default([]) %}
+Address={{ address }}
+{%   endfor %}
+{% endif %}
+{% for nameserver in config.nameservers.addresses|default([]) %}
+DNS={{ nameserver }}
+{% endfor %}
+{% if config.nameservers.domains is defined %}
+Domains={{ config.nameservers.domains | join(" ") }}
+{% endif %}
+
+{% for route in config.routes|default([]) %}
+[Route]
+Destination={{ route.to }}
+Gateway={{ route.via }}
+{% endfor %}
+
+{# Disable DHCPv4 and IPv6 RA learning of DNS, NTP, and default gateway #}
+{% if config.dhcp|default(false) and not config.dhcp_allow_learning|default(true) %}
+[DHCPv4]
+UseDNS=no
+UseNTP=no
+UseDomains=no
+UseRoutes=no
+UseGateway=no
+
+[IPv6AcceptRA]
+UseDNS=no
+UseDomains=no
+UseGateway=no
+UseRoutePrefix=no
+{% endif %}
