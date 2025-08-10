@@ -7,13 +7,18 @@ Name={{ config.name|default(config.ifname) }}
 {% else %}
 Name={{ config.name }}
 {% endif %}
+{% if type == "vlan" %}
+Type=vlan
+{% endif %}
 
 [Link]
 MTUBytes={{ config.mtu | default(9000 if type == "bridge" else 1500) }}
 
 [Network]
-{% if type == "vlan" %}
-Bridge={{ config.bridge }}
+{% if type == "bridge" %}
+{%   for vlan in network_vlans|default([]) %}
+VLAN={{ vlan.name }}
+{%   endfor %}
 {% endif %}
 KeepConfiguration=yes
 LinkLocalAddressing=ipv6

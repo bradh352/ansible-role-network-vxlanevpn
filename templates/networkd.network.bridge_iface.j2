@@ -5,7 +5,7 @@
 [Match]
 Name={{ interface.ifname }}
 {% else %}
-{% include "networkd.match.j2" %}
+{% include "networkd.network.match.j2" %}
 {% endif %}
 
 [Network]

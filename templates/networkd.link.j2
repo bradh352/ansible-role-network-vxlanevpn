@@ -2,7 +2,7 @@
 {#   - interface: dictionary of interface configuration attributes #}
 {#   - config: general configuration for bond, bridge or interface #}
 {#   - defaultmtu: default MTU size to use if not specified #}
-{% include "networkd.match.j2" %}
+{% include "networkd.link.match.j2" %}
 
 [Link]
 {# Name should only exist for network_interfaces, not bridges or bonds #}
