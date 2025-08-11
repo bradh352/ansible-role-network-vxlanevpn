@@ -14,5 +14,5 @@ MTUBytes={{ config.mtu|default(defaultmtu) }}
 {% if interface.speed is defined %}
 BitsPerSecond={{ interface.speed }}
 {% endif %}
-Duplex=Full
+Duplex=full
 AutoNegotiation={{ 'yes' if interface.autonegotiation|default(true) else 'no' }}

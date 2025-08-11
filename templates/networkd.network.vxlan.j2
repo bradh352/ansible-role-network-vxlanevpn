@@ -13,6 +13,7 @@ Bridge={{ config.bridge }}
 {% set vlan_aware = network_bridges | selectattr('name', 'equalto', config.bridge) | map(attribute='vlan_aware') | list | first | default(true) %}
 {% if vlan_aware %}
 {%   if config.vlan is defined %}
+
 [BridgeVLAN]
 PVID={{ config.vlan }}
 EgressUntagged={{ config.vlan }}

@@ -122,7 +122,7 @@
   loop: >-
       {%- set items = [] %}
       {%- for bridge in network_bridges %}
-      {%-   for interface in bridge.interfaces %}
+      {%-   for interface in bridge.interfaces|default([]) %}
       {%-     if interface.ifname|default("") not in network_bond_names %}
       {%-       do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
       {%-     endif %}
@@ -150,6 +150,12 @@
       {{- items -}}
   when: network_bonds is defined
 
+- name: "Networkd: Netdev: VTEP interface"
+  template:
+    src: "networkd.netdev.vtep.j2"
+    dest: "/etc/systemd/network/10-vtep.netdev"
+  when: network_vtep_ip is defined
+
 - name: "Networkd: NetDev: bonds"
   template:
     src: "networkd.netdev.bond.j2"
@@ -171,7 +177,7 @@
 - name: "Networkd: NetDev: vlan"
   template:
     src: "networkd.netdev.vlan.j2"
-    dest: "/etc/systemd/network/40-vlan-{{ config.name }}.netdev"
+    dest: "/etc/systemd/network/40-bridge-{{ config.bridge }}-vlan{{config.vlan}}-{{ config.name }}.netdev"
   vars:
     config: "{{ item }}"
   loop: "{{ network_vlans }}"
@@ -185,6 +191,12 @@
     config: "{{ item }}"
   loop: "{{ network_vxlan_interfaces }}"
   when: network_vxlan_interfaces is defined
+
+- name: "Networkd: Network: vtep"
+  template:
+    src: "networkd.network.vtep.j2"
+    dest: "/etc/systemd/network/10-vtep.network"
+  when: network_vtep_ip is defined
 
 - name: "Networkd: Network: vxlan"
   template:
@@ -204,6 +216,18 @@
     type: "eth"
   loop: "{{ network_interfaces }}"
   when: network_interfaces is defined
+
+- name: "Networkd: Network: underlay"
+  template:
+    src: "networkd.network.underlay.j2"
+    dest: "/etc/systemd/network/10-underlay-iface{{ index }}.network"
+  vars:
+    config: "{{ item }}"
+    interface: "{{ item }}"
+  loop: "{{ network_underlay_interfaces }}"
+  loop_control:
+    index_var: index
+  when: network_underlay_interfaces is defined
 
 - name: "Networkd: Network: bond iface"
   template:
@@ -234,7 +258,7 @@
   loop: >-
       {%- set items = [] %}
       {%- for bridge in network_bridges %}
-      {%-   for interface in bridge.interfaces %}
+      {%-   for interface in bridge.interfaces|default([]) %}
       {%-     do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
       {%-   endfor %}
       {%- endfor %}
@@ -244,7 +268,7 @@
 - name: "Networkd: Network: vlans"
   template:
     src: "networkd.network.j2"
-    dest: "/etc/systemd/network/60-bridge-{{ config.bridge }}-vlan-{{ config.name }}.network"
+    dest: "/etc/systemd/network/60-bridge-{{ config.bridge }}-vlan{{config.vlan}}-{{ config.name }}.network"
   vars:
     config: "{{ item }}"
     type: "vlan"

@@ -28,7 +28,7 @@ Bond Interfaces:
 {# ----- Validate bridge interface names ---- #}
 Bridge Interfaces:
 {% for bridge in network_bridges|default([]) %}
-{%   for interface in bridge.interfaces %}
+{%   for interface in bridge.interfaces|default([]) %}
 {%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=bond_ifnames) %}
 {{ bridge.name }}.{{ loop.index0 }}: {{ ifnames }}
 {%   endfor %}
