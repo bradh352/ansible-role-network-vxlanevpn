@@ -234,11 +234,34 @@ recommended to create a file like `host_vars/host-fqdn.yml` that contains
 these settings.
 
 ### Example
+
+#### Single Interface
+```
+network_interfaces:
+  - name: "mgmt"
+    macaddr: "ac:1f:6b:2d:85:83"
+    addresses:
+      - "192.168.1.81/24"
+    mtu: 1500
+    routes:
+      - to: 0.0.0.0/0
+        via: 192.168.1.1
+    nameservers:
+      addresses:
+        - 8.8.8.8
+        - 2001:4860:4860::8888
+      search:
+        - testenv.bradhouse.dev
+```
+
+#### VXLAN EVPN BGP Unnumbered
 ```
 network_vtep_ip: "172.17.0.2"
 network_underlay_asn: 4201000002
 network_underlay_interfaces:
   - driver: "mlx5_core"
+    speed: 25000
+    fec: rs
 network_underlay_mtu: 9100
 network_vxlans:
   - vni: 100
@@ -284,8 +307,76 @@ network_bridges:
       search:
         - "sn1.example.com"
         - "sn2.example.com"
-network_interfaces:
-  - ifname: "ens1"
-    dhcp: "yes"
+```
+
+#### VXLAN EVPN via VLAN on Bridge with STP
+```
+network_vtep_ip: "172.17.0.2"
+network_underlay_asn: 4201000002
+network_underlay_srcip: "172.18.0.2"
+network_underlay_peergroups:
+  - "cloudstack_mgmt"
+  - "cloudstack_kvm"
+network_bridges:
+  # Vlan-aware bridge with spanning tree with specified interfaces being trunk ports
+  - name "br0"
+    interfaces:
+      - driver: "mlx5_core"
+        speed: 25000
+        fec: rs
+    mtu: 9100
+    stp: true
+    vlan_aware: true
+  # The rest are VXLAN-specific bridges where various vxlans attach
+  - name: "hypervisor"
+    stp: false
+    vlan_aware: false
+    mtu: 9000
+    addresses:
+      - "10.10.100.2/24"
+      - "2620:1234:100::2/64"
+  - name: "ceph"
+    stp: false
+    vlan_aware: false
+    mtu: 9000
+    addresses:
+      - "10.10.200.2/24"
+      - "2620:1234:200::2/64"
+  - name: "public"
+    stp: false
+    vlan_aware: false
+    mtu: 1500
+    addresses:
+      - "10.10.1.2/24"
+      - "2620:1234:1::2/64"
+    routes:
+      - to: "0.0.0.0/0"
+        via: "10.10.1.1"
+      - to: "::/0"
+        via: "2620:1234:1::1/64"
+    nameservers:
+      addresses:
+        - 8.8.8.8
+        - 2001:4860:4860::8888
+      search:
+        - "sn1.example.com"
+        - "sn2.example.com"
+network_vlans:
+  - name: "vxlanbgp"
+    vlan: 123
+    addresses:
+      - "172.18.0.2/24" # This matches `network_underlay_srcip` above
+    mtu: 9100
+    bridge: "br0"
+network_vxlans:
+  - vni: 100
+    mtu: 9000
+    bridge: "hypervisor"
+  - vni: 200
+    mtu: 9000
+    bridge: "ceph"
+  - vni: 2
+    mtu: 1500
+    bridge: "public"
 ```
 
