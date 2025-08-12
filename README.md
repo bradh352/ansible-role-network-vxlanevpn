@@ -6,29 +6,40 @@ Original Repository: https://github.com/bradh352/ansible-role-network-vxlanevpn
 
 ## Overview
 
-This role is used to configure a Linux host to participate in a pure Layer3
-VXLAN EVPN network.  The underlay is provisioned using BGP Unnumbered
-(using only link-local ip addresses).  The BGP stack in use is FRR.
+This role is used to configure a Linux host for networking.  This role supports
+all the various common networking setup you might expect such as network
+interfaces, vlans, bonds, and bridges.  In addition, it supports VXLAN EVPN
+for those wanting to participate in a pure Layer3 VXLAN EVPN network.
 
-It is strongly recommended to use a network card that supports VXLAN offloading
-such as Mellanox/Nvidia Connect-X4 or better.
+When using VXLAN EVPN, the underlay can be provisioned using BGP Unnnumbered
+(using only link-local ip addresses) when the upstream switch is participating
+in the VXLAN network. Otherwise specific peers may be specified by referencing
+an ansible group. The BGP stack in use is FRR.
 
-This role is initially targeting Ubuntu, and tested on 24.04LTS.
+When using VXLAN EVPN, it is strongly recommended to use a network card that
+supports VXLAN offloading such as Mellanox/Nvidia Connect-X4 or better.
+
+This role is initially targeting Ubuntu, and tested on 24.04LTS.  This generates
+systemd-networkd configuration directly, so should be portable to any modern
+systemd system with minimal effort.
 
 ## Variables used by this role
 
-* `network_vtep_ip`: Required. IPv4 address and subnet used by the underlay
-  network for VXLAN tunnel endpoints.  This IP address is exchanged using
-  BGP Unnumbered to facilitate communication, it must be unique across the
-  underlay.  A subnet mask must be specified for the firewall to know what
-  address ranges are allowed, however only a `/32` will be advertised.
+* `network_vtep_ip`: Required when using VXLAN-EVPN. IPv4 address and subnet
+  used by the underlay network for VXLAN tunnel endpoints.  This IP address is
+  exchanged using BGP Unnumbered to facilitate communication, it must be unique
+  across the underlay.  A subnet mask must be specified for the firewall to know
+  what address ranges are allowed, however only a `/32` will be advertised.
   e.g. `172.17.0.2/24`
-* `network_underlay_asn`: Required. Autonomous System Number to use for the
-   underlay. This should be unique across the underly.  The private ASN range
-   is `64512` to `65534` and `4200000000` to `4294967294`.
-* `network_underlay_interfaces`: Required. List of interfaces to use for the
-  underlay network.  These are BGP unnumbered interfaces that cannot be used for
-  any other purpose.  They must specify only ***one*** of the below options.
+* `network_underlay_asn`: Required when using VXLAN-EVPN. Autonomous System
+   Number to use for the underlay. This should be unique across the underly.
+   The private ASN range is `64512` to `65534` and `4200000000` to `4294967294`.
+* `network_underlay_interfaces`: List of interfaces to use for the underlay
+  network.  These are BGP unnumbered interfaces that cannot be used for
+  any other purpose.  If not using this option, then
+  `network_underlay_peergroup` and `network_underlay_srcip` must be specified
+  when using VXLAN-EVPN.  This configuration must specify only ***one*** of
+  `iface`, `pattern`, `macaddr` or `driver` below.
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  This is also
       used if specifying a bond or vlan interface created by this role.
     * `pattern`: Regex pattern to match on interface name.  This can add more
@@ -43,28 +54,32 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
     * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
       `llrs`. Defaults to `auto` if link speed specified is less than `25000`
       otherwise defaults to `auto` (including if link speed not specifed).
-* `network_underlay_peergroup`: If not using BGP Unnumbered, this is the group
-  to reference for other members to peer with.
-* `network_underlay_srcip`: Source ip address for BGP peering.
+* `network_underlay_peergroup`: If using VXLAN-EVPN but not using BGP
+  Unnumbered, this is the group to reference for other members to peer with,
+  which is required for this use-case.
+* `network_underlay_srcip`: If using VXLAN-EVPN but not using BGP
+  Unnumbered, this is the source ip address for BGP peering which is required
+  for this use-case.
 * `network_underlay_mtu`: MTU to use for all underlay interfaces.  Defaults
   to `9100` if not specified.  This must be at least 54 bytes greater than
   the largest `network_vxlans` mtu.
-* `network_vxlans`: List of virtual vxlan interfaces to create.  These
-  are similar to vlan interfaces when the host will be participating in the
-  vxlan, but are technically created as bridges.
+* `network_vxlans`: List of vxlan VNIs to associate with the host.  These must
+  be attached to a bridge for the host to use them.
   * `name`: Interface name to assign
   * `vni`: VXLAN vni (`1` to `16777215`). Required.
   * `bridge`: Bridge to attach vlan to. Required.
   * `vlan`: VLAN to assign to local bridge. Required if bridge is vlan aware.
     ***NOTE***: Currently using vlan aware bridges to attach VXLAN devices does
-    not work, this is a WIP.  Please create a bridge per vxlan.
+    not work, this is a WIP.  Please create a non-vlan-aware bridge per vxlan
+    for now.
   * `mtu`: MTU. Must be at least 54 bytes less than `network_underlay_mtu` or
     the MTU of the interfaces involved in the BGP EVPN sessions. Defaults to
     `1500`.  Recommended `9000` for Jumbo Frames.
 * `network_interfaces`: These are interfaces which do not participate in vxlan,
-  bond, or bridge networks. It uses the same format as
-  `network_vxlans`, must specify one of `ifname`, `pattern`,
-  `macaddr`, or `driver` for interface matching.
+  bond, or bridge networks. Must specify one (and only one) of `ifname`,
+  `pattern`, `macaddr`, or `driver` for interface matching.  Ip address
+  and routing information may be associated with a bridge if desired (mostly
+  useful for non-vlan-aware bridges).
   * `name`: Name to assign network interface.  Must be specified if not using
     `ifname`.
   * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
@@ -105,8 +120,8 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
    specified in a bond, and when using pattern matching or driver matching
    those too may resolve to multiple interfaces.
   * `name`: Interface name to assign for bond.
-  * `interfaces`: List of interfaces in the bond. Must specify one of `ifname`,
-    `pattern`, `macaddr`, or `driver` for interface matching.
+  * `interfaces`: List of interfaces in the bond. Must specify one (and only
+    one of) `ifname`, `pattern`, `macaddr`, or `driver` for interface matching.
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
     * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
       Care must be taken not to match more than one interface or an error will
@@ -141,11 +156,11 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
     * `addresses`: List of addresses for nameservers,
       e.g. `8.8.8.8` or `2001:4860:4860::8888`
     * `search`: List of search domains, e.g. `internal.example.com`
-* `network_bridges`: Create a network bridge.  The bridge will have spanning
-  tree enabled.
-  * `name`: Interface name to assign for bond.
-  * `interfaces`: List of interfaces in the bridge. Must specify one of `ifname`,
-    `pattern`, `macaddr`, or `driver` for interface matching.
+* `network_bridges`: Create a network bridge.
+  * `name`: Interface name to assign for bridge.
+  * `interfaces`: List of interfaces in the bridge. Must specify one of (and
+    only one of) `ifname`, `pattern`, `macaddr`, or `driver` for interface
+    matching.
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  May also
       include the name of a bond created.
     * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
