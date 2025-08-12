@@ -43,6 +43,9 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
     * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
       `llrs`. Defaults to `auto` if link speed specified is less than `25000`
       otherwise defaults to `auto` (including if link speed not specifed).
+* `network_underlay_peergroup`: If not using BGP Unnumbered, this is the group
+  to reference for other members to peer with.
+* `network_underlay_srcip`: Source ip address for BGP peering.
 * `network_underlay_mtu`: MTU to use for all underlay interfaces.  Defaults
   to `9100` if not specified.  This must be at least 54 bytes greater than
   the largest `network_vxlan_interfaces` mtu.

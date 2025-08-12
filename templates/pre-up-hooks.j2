@@ -10,7 +10,6 @@ case "$IFACE" in
 {%     if ifname not in bond_ifnames + bridge_ifnames %}
     {{ ifname }})
       ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
-      ethtool -s {{ ifname }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
 {%     endif %}
 {%   endfor %}
@@ -22,19 +21,17 @@ case "$IFACE" in
 {%     for ifname in ifnames %}
     {{ ifname }})
       ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
-      ethtool -s {{ ifname }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
 {%     endfor %}
 {%   endfor %}
 {% endfor %}
 {# ------ BRIDGE PHYSICAL ETHERNET INTERFACES ------ #}
 {% for bridge in network_bridges|default([]) %}
-{%   for interface in bridge.interfaces %}
+{%   for interface in bridge.interfaces|default([]) %}
 {%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface.interfaces) | from_yaml %}
 {%     for ifname in ifnames %}
     {{ ifname }})
       ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
-      ethtool -s {{ ifname }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
 {%     endfor %}
 {%   endfor %}
@@ -44,7 +41,6 @@ case "$IFACE" in
 {%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
     {{ ifnames[0] }})
       ethtool --set-fec {{ ifnames[0] }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
-      ethtool -s {{ ifnames[0] }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
       ;;
 {% endfor %}
     *)

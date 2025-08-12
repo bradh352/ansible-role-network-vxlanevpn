@@ -1,18 +1,30 @@
 ---
+
+- name: "Reboot (one node at a time)"
+  reboot:
+    msg: "rebooting now"
+    connect_timeout: 10
+    post_reboot_delay: 60
+  when: networkd.changed
+  throttle: 1
+  listen: reboot
+
+- name: sysctl-restart
+  service:
+    name: systemd-sysctl
+    state: restarted
+
+- name: "Refresh facts"
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+  when: networkd.changed
+  listen: reboot
+
+- name: network_restart
+  include_tasks: "tasks/network_restart.yml"
+
 - name: frr_reload
   service:
     name: frr
     state: reloaded
-
-- name: frr_restart
-  service:
-    name: frr
-    state: restarted
-
-- name: networkctl_reload
-  shell: networkctl reload
-
-- name: sysctl_restart
-  service:
-    name: systemd-sysctl
-    state: restarted
