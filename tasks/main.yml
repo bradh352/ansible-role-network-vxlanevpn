@@ -25,13 +25,13 @@
 
 - name: "VXLAN: Sanity check peer configuration"
   fail:
-    msg: "must provide network_underlay_interfaces or network_underlay_peergroup for vxlan evpn peering"
-  when: network_vtep_ip is defined and (network_underlay_interfaces|default([])|length == 0 and network_underlay_peergroup is not defined)
+    msg: "must provide network_underlay_interfaces or network_underlay_peergroups for vxlan evpn peering"
+  when: network_vtep_ip is defined and (network_underlay_interfaces|default([])|length == 0 and network_underlay_peergroups|default([])|length == 0)
 
 - name: "VXLAN: Sanity check peergroup configuration"
   fail:
-    msg: "must provide network_underlay_srcip when using network_underlay_peergroup is used"
-  when: network_vtep_ip is defined and network_underlay_peergroup is defined and network_underlay_srcip is not defined
+    msg: "must provide network_underlay_srcip when using network_underlay_peergroups is used"
+  when: network_vtep_ip is defined and network_underlay_peergroups is defined and network_underlay_srcip is not defined
 
 - name: FRR
   block:

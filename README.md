@@ -36,12 +36,14 @@ systemd system with minimal effort.
    The private ASN range is `64512` to `65534` and `4200000000` to `4294967294`.
 * `network_underlay_interfaces`: List of interfaces to use for the underlay
   network.  These are BGP unnumbered interfaces that cannot be used for
-  any other purpose.  If not using this option, then
-  `network_underlay_peergroup` and `network_underlay_srcip` must be specified
-  when using VXLAN-EVPN.  This configuration must specify only ***one*** of
-  `iface`, `pattern`, `macaddr` or `driver` below.
+  any other purpose.  These interfaces may be an ethernet interface, a
+  configured bond, a configured bridge, or a configured vlan interface.  If not
+  using this option, then `network_underlay_peergroup` and
+  `network_underlay_srcip` must be specified when using VXLAN-EVPN.  This
+  configuration must specify only ***one*** of `iface`, `pattern`, `macaddr`,
+  or `driver` below.
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  This is also
-      used if specifying a bond or vlan interface created by this role.
+      used if specifying a bond, bridge, or vlan interface created by this role.
     * `pattern`: Regex pattern to match on interface name.  This can add more
       than one interface at a time. e.g. `ens.*`, `ens[23]`
     * `macaddr`: Mac address of interface
@@ -54,9 +56,10 @@ systemd system with minimal effort.
     * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
       `llrs`. Defaults to `auto` if link speed specified is less than `25000`
       otherwise defaults to `auto` (including if link speed not specifed).
-* `network_underlay_peergroup`: If using VXLAN-EVPN but not using BGP
-  Unnumbered, this is the group to reference for other members to peer with,
-  which is required for this use-case.
+* `network_underlay_peergroups`: If using VXLAN-EVPN but not using BGP
+  Unnumbered, specify a *list* of groups that contain members to be peered with.
+  Each member of the specified groups must contain `network_underlay_srcip` or
+  an error will be thrown.
 * `network_underlay_srcip`: If using VXLAN-EVPN but not using BGP
   Unnumbered, this is the source ip address for BGP peering which is required
   for this use-case.
@@ -200,6 +203,31 @@ systemd system with minimal effort.
     * `addresses`: List of addresses for nameservers,
       e.g. `8.8.8.8` or `2001:4860:4860::8888`
     * `search`: List of search domains, e.g. `internal.example.com`
+* `network_vlans`: Create a vlan interface attached to a vlan-aware bridge
+  in order for the host to be able to participate in the VLAN.
+  * `name`: Interface name to assign for vlan. Required.
+  * `vlan`: VLAN id to associate with interface.
+  * `mtu`: MTU. Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
+  * `dhcp`: Default `false`. Set to true to use dhcp (also enables ipv6 RA).
+    Cannot be used with `addresses`.
+  * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning
+    of things like routes (including default route), dns, and ntp.  The default
+    is false as there is an assumption this is a backdoor interface rather than
+    primary.
+  * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
+    used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
+  * `routes`: List of routes.  If none specified will only be able to access
+    other machines in the same subnet.  Typically not used with `dhcp`.
+    * `to`: Subnet to add route for.  Use `0.0.0.0/0` or `::/0` for default
+      route for ipv4 or ipv6, respectively.
+    * `via`: Gateway to use to access specified subnet. e.g. `10.23.45.1` or
+      `2600:1234::1`
+  * `nameservers`: Dictionary of values for DNS configuration. Typically not
+    used with `dhcp`.
+    * `addresses`: List of addresses for nameservers,
+      e.g. `8.8.8.8` or `2001:4860:4860::8888`
+    * `search`: List of search domains, e.g. `internal.example.com`
+
 
 ***NOTE***: Typically variables will be placed in the host vars, it is
 recommended to create a file like `host_vars/host-fqdn.yml` that contains
