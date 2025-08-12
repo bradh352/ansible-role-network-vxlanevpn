@@ -29,7 +29,7 @@
 {%   do files.append("40-bridge-" ~ vlan.bridge ~ "-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ ".netdev") %}
 {%   do files.append("60-bridge-" ~ vlan.bridge ~ "-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ ".network") %}
 {% endfor %}
-{% for vxlan in network_vxlan_interfaces|default([]) %}
+{% for vxlan in network_vxlans|default([]) %}
 {%   do files.append("40-vxlan" ~ vxlan.vni ~ ".netdev") %}
 {%   do files.append("50-bridge-" ~ vxlan.bridge ~ "-vxlan" ~ vxlan.vni ~ ('-vlan' ~ vxlan.vlan if vxlan.vlan is defined else '') ~ ".network") %}
 {% endfor %}

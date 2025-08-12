@@ -48,33 +48,22 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.
 * `network_underlay_srcip`: Source ip address for BGP peering.
 * `network_underlay_mtu`: MTU to use for all underlay interfaces.  Defaults
   to `9100` if not specified.  This must be at least 54 bytes greater than
-  the largest `network_vxlan_interfaces` mtu.
-* `network_vxlan_interfaces`: List of virtual vxlan interfaces to create.  These
+  the largest `network_vxlans` mtu.
+* `network_vxlans`: List of virtual vxlan interfaces to create.  These
   are similar to vlan interfaces when the host will be participating in the
   vxlan, but are technically created as bridges.
   * `name`: Interface name to assign
   * `vni`: VXLAN vni (`1` to `16777215`). Required.
   * `bridge`: Bridge to attach vlan to. Required.
   * `vlan`: VLAN to assign to local bridge. Required if bridge is vlan aware.
-  * `mtu`: MTU. Must be at least 54 bytes less than `network_underlay_mtu`.
-    Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
-  * `dhcp`: Default `false`. Set to true to use dhcp.  (also enables ipv6 RA).
-    Cannot be used with `addresses`.
-  * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
-    used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
-  * `routes`: List of routes.  If none specified will only be able to access
-    other machines in the same subnet.
-    * `to`: Subnet to add route for.  Use `0.0.0.0/0` or `::/0` for default
-      route for ipv4 or ipv6, respectively.
-    * `via`: Gateway to use to access specified subnet. e.g. `10.23.45.1` or
-      `2600:1234::1`
-  * `nameservers`: Dictionary of values for DNS configuration
-    * `addresses`: List of addresses for nameservers,
-      e.g. `8.8.8.8` or `2001:4860:4860::8888`
-    * `search`: List of search domains, e.g. `internal.example.com`
+    ***NOTE***: Currently using vlan aware bridges to attach VXLAN devices does
+    not work, this is a WIP.  Please create a bridge per vxlan.
+  * `mtu`: MTU. Must be at least 54 bytes less than `network_underlay_mtu` or
+    the MTU of the interfaces involved in the BGP EVPN sessions. Defaults to
+    `1500`.  Recommended `9000` for Jumbo Frames.
 * `network_interfaces`: These are interfaces which do not participate in vxlan,
   bond, or bridge networks. It uses the same format as
-  `network_vxlan_interfaces`, must specify one of `ifname`, `pattern`,
+  `network_vxlans`, must specify one of `ifname`, `pattern`,
   `macaddr`, or `driver` for interface matching.
   * `name`: Name to assign network interface.  Must be specified if not using
     `ifname`.
@@ -208,21 +197,34 @@ network_underlay_asn: 4201000002
 network_underlay_interfaces:
   - driver: "mlx5_core"
 network_underlay_mtu: 9100
-network_vxlan_interfaces:
+network_vxlans:
+  - vni: 100
+    mtu: 9000
+    bridge: "hypervisor"
+  - vni: 200
+    mtu: 9000
+    bridge: "ceph"
+  - vni: 2
+    mtu: 1500
+    bridge: "public"
+network_bridges:
   - name: "hypervisor"
-    vni: 100
+    stp: false
+    vlan_aware: false
     mtu: 9000
     addresses:
       - "10.10.100.2/24"
       - "2620:1234:100::2/64"
   - name: "ceph"
-    vni: 200
+    stp: false
+    vlan_aware: false
     mtu: 9000
     addresses:
       - "10.10.200.2/24"
       - "2620:1234:200::2/64"
   - name: "public"
-    vni: 1
+    stp: false
+    vlan_aware: false
     mtu: 1500
     addresses:
       - "10.10.1.2/24"

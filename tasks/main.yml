@@ -15,8 +15,8 @@
 
 - name: "VXLAN: Sanity check base config: vtep/vxlaniface"
   fail:
-    msg: "network_vtep_ip is not defined, but network_vxlan_interfaces is defined"
-  when: network_vtep_ip is not defined and network_vxlan_interfaces is defined
+    msg: "network_vtep_ip is not defined, but network_vxlans is defined"
+  when: network_vtep_ip is not defined and network_vxlans is defined
 
 - name: "VXLAN: Sanity check base config: vtep/underlay"
   fail:
@@ -250,8 +250,8 @@
     dest: "/etc/systemd/network/40-vxlan{{ config.vni }}.netdev"
   vars:
     config: "{{ item }}"
-  loop: "{{ network_vxlan_interfaces }}"
-  when: network_vxlan_interfaces is defined
+  loop: "{{ network_vxlans }}"
+  when: network_vxlans is defined
   notify: network_restart
 
 - name: "Networkd: Network: vtep"
@@ -267,8 +267,8 @@
     dest: "/etc/systemd/network/50-bridge-{{ config.bridge }}-vxlan{{ config.vni }}{{ '-vlan' ~ config.vlan if config.vlan is defined else '' }}.network"
   vars:
     config: "{{ item }}"
-  loop: "{{ network_vxlan_interfaces }}"
-  when: network_vxlan_interfaces is defined
+  loop: "{{ network_vxlans }}"
+  when: network_vxlans is defined
   notify: network_restart
 
 - name: "Networkd: Network: eth"
