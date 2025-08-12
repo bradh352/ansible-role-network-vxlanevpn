@@ -28,9 +28,9 @@ systemd system with minimal effort.
 
 * `network_vtep_ip`: Required when using VXLAN-EVPN. IPv4 address and subnet
   used by the underlay network for VXLAN tunnel endpoints.  This IP address is
-  exchanged using BGP Unnumbered to facilitate communication, it must be unique
-  across the underlay.  A subnet mask must be specified for the firewall to know
-  what address ranges are allowed, however only a `/32` will be advertised.
+  exchanged using BGP to facilitate communication, it must be unique across the
+  underlay.  A subnet mask must be specified for the firewall to know what
+  address ranges are allowed, however only a `/32` will be advertised.
   e.g. `172.17.0.2/24`
 * `network_underlay_asn`: Required when using VXLAN-EVPN. Autonomous System
    Number to use for the underlay. This should be unique across the underly.
@@ -98,8 +98,7 @@ systemd system with minimal effort.
     Cannot be used with `addresses`.
   * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning
     of things like routes (including default route), dns, and ntp.  The default
-    is false as there is an assumption this is a backdoor interface rather than
-    primary.
+    is `true`.
   * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
     used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
   * `routes`: List of routes.  If none specified will only be able to access
@@ -145,8 +144,7 @@ systemd system with minimal effort.
     Cannot be used with `addresses`.
   * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning
     of things like routes (including default route), dns, and ntp.  The default
-    is false as there is an assumption this is a backdoor interface rather than
-    primary.
+    is `true`.
   * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
     used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
   * `routes`: List of routes.  If none specified will only be able to access
@@ -189,8 +187,7 @@ systemd system with minimal effort.
     Cannot be used with `addresses`.
   * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning
     of things like routes (including default route), dns, and ntp.  The default
-    is false as there is an assumption this is a backdoor interface rather than
-    primary.
+    is `true`.
   * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
     used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
   * `routes`: List of routes.  If none specified will only be able to access
@@ -213,8 +210,7 @@ systemd system with minimal effort.
     Cannot be used with `addresses`.
   * `dhcp_allow_learning`: If dhcp is enabled, this is whether to allow learning
     of things like routes (including default route), dns, and ntp.  The default
-    is false as there is an assumption this is a backdoor interface rather than
-    primary.
+    is `true`.
   * `addresses`: List of ip (v4 or v6) addresses with subnet mask.  Cannot be
     used with `dhcp`.  e.g.: `10.23.45.2/24`, `2600:1234::2/64`
   * `routes`: List of routes.  If none specified will only be able to access
