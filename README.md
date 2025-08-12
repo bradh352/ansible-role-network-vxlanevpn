@@ -14,7 +14,8 @@ for those wanting to participate in a pure Layer3 VXLAN EVPN network.
 When using VXLAN EVPN, the underlay can be provisioned using BGP Unnnumbered
 (using only link-local ip addresses) when the upstream switch is participating
 in the VXLAN network. Otherwise specific peers may be specified by referencing
-an ansible group. The BGP stack in use is FRR.
+the ansible groups for which participating members are a part of. The BGP stack
+in use is FRR.
 
 When using VXLAN EVPN, it is strongly recommended to use a network card that
 supports VXLAN offloading such as Mellanox/Nvidia Connect-X4 or better.
