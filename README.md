@@ -77,7 +77,7 @@ systemd system with minimal effort.
   * `vlan`: VLAN to assign to local bridge. Required if bridge is vlan aware.
     ***NOTE***: Currently using vlan aware bridges to attach VXLAN devices does
     not work, this is a WIP.  Please create a non-vlan-aware bridge per vxlan
-    for now.
+    for now.  Likely requires SystemD v258+ (not released as of this writing).
   * `mtu`: MTU. Must be at least 54 bytes less than `network_underlay_mtu` or
     the MTU of the interfaces involved in the BGP EVPN sessions. Defaults to
     `1500`.  Recommended `9000` for Jumbo Frames.
@@ -392,3 +392,74 @@ network_vxlans:
     ifname: "public"
 ```
 
+#### VXLAN EVPN via VLAN on Bridge using a Bond as uplink, public interface is a vlan
+```
+network_vtep_ip: "172.17.0.2"
+network_underlay_asn: 4201000002
+network_underlay_srcip: "172.18.0.2"
+network_underlay_peergroups:
+  - "cloudstack_mgmt"
+  - "cloudstack_kvm"
+network_bonds:
+  - name: "uplink"
+    interfaces:
+      - driver: "mlx5_core"
+        speed: 25000
+        fec: rs
+    mtu: 9100
+network_bridges:
+  # Vlan-aware bridge with spanning tree with specified interfaces being trunk ports
+  - name "br0"
+    interfaces:
+      - ifname: "uplink"
+    mtu: 9100
+    stp: true
+    vlan_aware: true
+  # The rest are VXLAN-specific bridges where various vxlans attach
+  - name: "hypervisor"
+    stp: false
+    vlan_aware: false
+    mtu: 9000
+    addresses:
+      - "10.10.100.2/24"
+      - "2620:1234:100::2/64"
+  - name: "ceph"
+    stp: false
+    vlan_aware: false
+    mtu: 9000
+    addresses:
+      - "10.10.200.2/24"
+      - "2620:1234:200::2/64"
+network_vlans:
+  - name: "vxlanbgp"
+    vlan: 123
+    mtu: 9100
+    addresses:
+      - "172.18.0.2/24" # This matches `network_underlay_srcip` above
+    ifname: "br0"
+  - name: "public"
+    vlan: 2
+    mtu: 1500
+    addresses:
+      - "10.10.1.2/24"
+      - "2620:1234:1::2/64"
+    routes:
+      - to: "0.0.0.0/0"
+        via: "10.10.1.1"
+      - to: "::/0"
+        via: "2620:1234:1::1/64"
+    nameservers:
+      addresses:
+        - 8.8.8.8
+        - 2001:4860:4860::8888
+      search:
+        - "sn1.example.com"
+        - "sn2.example.com"
+network_vxlans:
+  - vni: 100
+    mtu: 9000
+    ifname: "hypervisor"
+  - vni: 200
+    mtu: 9000
+    ifname: "ceph"
+```
