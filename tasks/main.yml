@@ -106,10 +106,6 @@
   notify: network_vxlanevpn_reboot
   when: network_vtep_ip is defined
 
-- name: "Validate configuration"
-  set_fact:
-    validate_interfaces: "{{ lookup('template', 'validate_config.j2') }}"
-
 - name: "Cache bond names"
   set_fact:
     network_bond_names: "{{ network_bonds|default([]) | map(attribute='name') | list }}"
@@ -138,6 +134,10 @@
 - name: "Cache interface names"
   set_fact:
     network_interface_names: "{{ (network_interfaces|default([]) | selectattr('name', 'defined') | map(attribute='name') | list) + (network_interfaces|default([]) | rejectattr('name', 'defined') | map(attribute='ifname') | list) }}"
+
+- name: "Validate configuration"
+  set_fact:
+    validate_interfaces: "{{ lookup('template', 'validate_config.j2') }}"
 
 - name: "See if vxlan is using vlan aware bridging"
   set_fact:
