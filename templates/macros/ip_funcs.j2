@@ -1,4 +1,8 @@
-{% macro resolve_ifnames(debug_prefix, ansible_facts, interface, extra_ifnames=[], validate_ifname=true) -%}
+{% macro orig_ifname(namemap, name) %}
+{{- namemap['name']|default(name) -}}
+{% endmacro -%}
+
+{% macro resolve_ifnames(debug_prefix, ansible_facts, orignamemap, interface, extra_ifnames=[], validate_ifname=true) -%}
 {# This macro takes in a dictionary with one of ifname, macaddr, driver, or pattern specified #}
 {# and outputs an array of matching interface names #}
 {%   set iface_list = [] %}
@@ -6,11 +10,11 @@
 {%     if not interface.ifname in ansible_facts.interfaces and not interface.ifname in extra_ifnames and validate_ifname %}
 {{ notdefined | mandatory(msg=debug_prefix ~ ': interface, bond, or bridge with ifname ' + interface.ifname + ' not found') }}
 {%     endif %}
-{%     do iface_list.append(interface.ifname) %}
+{%     do iface_list.append(orig_ifname(orignamemap, interface.ifname)) %}
 {%   elif interface.macaddr is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if ansible_facts[host_iface].macaddress|default("") == interface.macaddr %}
-{%         do iface_list.append(host_iface) %}
+{%         do iface_list.append(orig_ifname(orignamemap, host_iface)) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -19,7 +23,7 @@
 {%   elif interface.driver is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if ansible_facts[host_iface].module|default("") == interface.driver %}
-{%         do iface_list.append(host_iface) %}
+{%         do iface_list.append(orig_ifname(orignamemap, host_iface)) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -28,7 +32,7 @@
 {%   elif interface.pattern is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if host_iface|regex_search(interface.pattern)|length > 0 %}
-{%         do iface_list.append(host_iface) %}
+{%         do iface_list.append(orig_ifname(orignamemap, host_iface)) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}

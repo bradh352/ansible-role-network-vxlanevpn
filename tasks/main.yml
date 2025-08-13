@@ -143,6 +143,15 @@
   set_fact:
     vxlan_vlan_bridge: "{{ true if network_vxlans | default([]) | map(attribute='vlan') | select('defined') | list | length > 0 else false }}"
 
+- name: "Retrieve original interface names if remapped"
+  script: iface_orig_names.sh
+  register: orig_names_str
+  changed_when: False
+
+- name: "Load original interface names dictionary"
+  set_fact:
+    network_orig_iface_names: "{{ orig_names_str.stdout|from_yaml }}"
+
 - name: "Set Expected Configuration Files"
   set_fact:
     expected_config_files: "{{ lookup('template', 'expected_config_files.j2') | from_yaml }}"
