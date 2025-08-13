@@ -27,14 +27,10 @@ network:
       dhcp4: no
       dhcp6: no
       accept-ra: no
-      {% if interface.name == 'public' %}
-      interfaces: [ infra100g1, infra100g2 ]
-      {% else %}
       interfaces:
         - vxlan{{ interface.vni }}
       link-local: [ ]
       mtu: {{ interface.mtu|default(1500) }}
-      {% endif %}
 {%     if interface.dhcp|default(false) %}
       dhcp4: true
       accept-ra: true
