@@ -77,7 +77,7 @@ router bgp {{ network_underlay_asn }}
 {%   set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
 {%   set vlan_ifnames = network_vlans|default([]) | map(attribute='name') | list %}
 {%   for interface in network_underlay_interfaces %}
-{%     set ifnames = ipfn.resolve_ifnames('network_underlay_interfaces[' ~ loop.index0 ~ ']', ansible_facts, interface, bond_ifnames + bridge_ifnames + vlan_ifnames) | from_yaml %}
+{%     set ifnames = ipfn.resolve_ifnames('network_underlay_interfaces[' ~ loop.index0 ~ ']', ansible_facts, network_orig_iface_names, interface, bond_ifnames + bridge_ifnames + vlan_ifnames) | from_yaml %}
 {%     for ifname in ifnames %}
   neighbor {{ ifname }} interface peer-group PEERS
 {%     endfor %}
