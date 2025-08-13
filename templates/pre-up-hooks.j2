@@ -2,12 +2,13 @@
 {% import 'macros/ip_funcs.j2' as ipfn %}
 {% set bond_ifnames = network_bonds|default([]) | map(attribute='name') | list %}
 {% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
+{% set vlan_ifnames = network_vlans|default([]) | map(attribute='name') | list %}
 case "$IFACE" in
 {# ------ VXLAN UNDERLAY PHYSICAL INTERFACES ------ #}
 {% for interface in network_underlay_interfaces|default([]) %}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, bond_ifnames + bridge_ifnames) | from_yaml %}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, bond_ifnames + bridge_ifnames + vlan_ifnames) | from_yaml %}
 {%   for ifname in ifnames %}
-{%     if ifname not in bond_ifnames + bridge_ifnames %}
+{%     if ifname not in bond_ifnames + bridge_ifnames + vlan_ifnames %}
     {{ ifname }})
       ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
       ;;
@@ -28,11 +29,13 @@ case "$IFACE" in
 {# ------ BRIDGE PHYSICAL ETHERNET INTERFACES ------ #}
 {% for bridge in network_bridges|default([]) %}
 {%   for interface in bridge.interfaces|default([]) %}
-{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface.interfaces) | from_yaml %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface.interfaces, bond_ifnames + vlan_ifnames) | from_yaml %}
 {%     for ifname in ifnames %}
+{%       if ifname not in bond_ifnames + vlan_ifnames %}
     {{ ifname }})
       ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
       ;;
+{%       endif %}
 {%     endfor %}
 {%   endfor %}
 {% endfor %}
