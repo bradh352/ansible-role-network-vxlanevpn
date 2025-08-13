@@ -5,7 +5,7 @@ Name=vxlan0
 #MTUBytes=9000
 
 [Network]
-Bridge={{ network_vxlans | selectattr("vlan") | map(attribute="bridge") | first }}
+Bridge={{ network_vxlans | selectattr("vlan") | map(attribute="ifname") | first }}
 
 [Bridge]
 VLANTunnel=true

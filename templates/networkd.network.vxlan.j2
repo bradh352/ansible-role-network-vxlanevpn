@@ -6,17 +6,17 @@ Name=vxlan{{ config.vni }}
 
 [Network]
 {% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
-{% if config.bridge not in bridge_ifnames %}
-{{ notdefined | mandatory(msg='vxlan vni ' ~ config.vni ~ ': bridge ' ~ config.bridge ~ ' not found') }}
+{% if config.ifname not in bridge_ifnames %}
+{{ notdefined | mandatory(msg='vxlan vni ' ~ config.vni ~ ': bridge ' ~ config.ifname ~ ' not found') }}
 {% endif %}
-Bridge={{ config.bridge }}
-{% set vlan_aware = network_bridges | selectattr('name', 'equalto', config.bridge) | map(attribute='vlan_aware') | list | first | default(true) %}
+Bridge={{ config.ifname }}
+{% set vlan_aware = network_bridges | selectattr('name', 'equalto', config.ifname) | map(attribute='vlan_aware') | list | first | default(true) %}
 {% if vlan_aware %}
 {%   if config.vlan is defined %}
 
 [BridgeVLAN]
 VLAN={{ config.vlan }}
 {%   else %}
-{{ notdefined | mandatory(msg='vxlan vni=' ~ config.vni ~ ', bridge=' ~ config.bridge ~ ': bridge is vlan aware but vlan not defined for vxlan') }}
+{{ notdefined | mandatory(msg='vxlan vni=' ~ config.vni ~ ', bridge=' ~ config.ifname ~ ': bridge is vlan aware but vlan not defined for vxlan') }}
 {%   endif %}
 {% endif %}

@@ -2,6 +2,7 @@
 {# ----- Collect all known interface names from configuration ---- #}
 {% set bond_ifnames = network_bonds|default([]) | map(attribute='name') | list %}
 {% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
+{% set vlan_ifnames = network_vlans|default([]) | map(attribute='name') | list %}
 {% set ether_ifnames = [] %}
 {# Handle the possibility that the the configuration is renaming an interface #}
 {% for interface in network_interfaces|default([]) %}
@@ -10,27 +11,26 @@
 {%   endif %}
 {%   do ether_ifnames.append(interface.name|default(interface.ifname)) %}
 {% endfor %}
-{% set all_ifnames = bond_ifnames + bridge_ifnames + ether_ifnames %}
 {# ----- Validate underlay interface names ---- #}
 BGP Unnumbered Underlay Interfaces:
 {% for interface in network_underlay_interfaces|default([]) %}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=all_ifnames) %}
-iface {{ loop.index }}: {{ ifnames }}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=bond_ifnames + bridge_ifnames + ether_ifnames + vlan_ifnames) %}
+  iface {{ loop.index }}: {{ ifnames }}
 {% endfor %}
 {# ----- Validate bond interface names ---- #}
 Bond Interfaces:
 {% for bond in network_bonds|default([]) %}
 {%   for interface in bond.interfaces %}
 {%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) %}
-{{ bond.name }}.{{ loop.index0 }}: {{ ifnames }}
+  {{ bond.name }}.{{ loop.index0 }}: {{ ifnames }}
 {%   endfor %}
 {% endfor %}
 {# ----- Validate bridge interface names ---- #}
 Bridge Interfaces:
 {% for bridge in network_bridges|default([]) %}
 {%   for interface in bridge.interfaces|default([]) %}
-{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=bond_ifnames) %}
-{{ bridge.name }}.{{ loop.index0 }}: {{ ifnames }}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=bond_ifnames + vlan_ifnames) %}
+  {{ bridge.name }}.{{ loop.index0 }}: {{ ifnames }}
 {%   endfor %}
 {% endfor %}
 {# ----- Validate ethernet interface names ---- #}
@@ -38,5 +38,13 @@ Ethernet Interfaces:
 {% for interface in network_interfaces|default([]) %}
 {# We can't guarantee the ifname exists if the user is renaming the interface, so turn off ifname validation #}
 {%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, validate_ifname=false) %}
-{{ interface.name|default(interface.ifname) }}: {{ ifnames }}
+  {{ interface.name|default(interface.ifname) }}: {{ ifnames }}
+{% endfor %}
+{# ----- Validate vlan interface names ---- #}
+VLAN Interfaces:
+{% for interface in network_vlans|default([]) %}
+{%   if interface.ifname not in ether_ifnames + bond_ifnames + bridge_ifnames %}
+{{ notdefined | mandatory(msg='vlan ' ~ interface.name ~ 'id ' ~ interface.vlan ~ 'master ' ~ interface.ifname ~ ' does not exist') }}
+{%   endif %}
+  {{ interface.name }}: {{ interface.ifname }}
 {% endfor %}

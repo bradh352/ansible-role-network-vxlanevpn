@@ -70,7 +70,7 @@ systemd system with minimal effort.
 * `network_vxlans`: List of vxlan VNIs to associate with the host.  These must
   be attached to a bridge for the host to use them.
   * `vni`: VXLAN vni (`1` to `16777215`). Required.
-  * `bridge`: Bridge to attach vlan to. Required.
+  * `ifname`: Bridge to attach vlan to. Required.
   * `vlan`: VLAN to assign to local bridge. Required if bridge is vlan aware.
     ***NOTE***: Currently using vlan aware bridges to attach VXLAN devices does
     not work, this is a WIP.  Please create a non-vlan-aware bridge per vxlan
@@ -82,7 +82,7 @@ systemd system with minimal effort.
   bond, or bridge networks. Must specify one (and only one) of `ifname`,
   `pattern`, `macaddr`, or `driver` for interface matching.  Ip address
   and routing information may be associated with a bridge if desired (mostly
-  useful for non-vlan-aware bridges).
+  useful for non-vlan-aware bridges).  VLAN interfaces must
   * `name`: Name to assign network interface.  Must be specified if not using
     `ifname`.
   * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`
@@ -163,7 +163,7 @@ systemd system with minimal effort.
     only one of) `ifname`, `pattern`, `macaddr`, or `driver` for interface
     matching.
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  May also
-      include the name of a bond created.
+      include the name of a bond or vlan created.
     * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
       Care must be taken not to match more than one interface or an error will
       be thrown.
@@ -177,6 +177,9 @@ systemd system with minimal effort.
     * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
       `llrs`. Defaults to `auto` if link speed specified is less than `25000`
       otherwise defaults to `auto` (including if link speed not specifed).
+    * `vlans`: List of vlans.  May be either a single vlan or a range, e.g. `10-20`.
+    * `pvid`: Primary vlan id of interface.  Untagged ingress packets shall have
+      this tag set, and egress packets in this vlan shall be sent out untagged.
   * `stp`: Boolean. Whether or not to enable Spanning Tree Protocol. Default `true`.
   * `vlan_aware`: Boolean. Whether or not the bridge is VLAN aware. Default `true`.
   * `pvid`: When `vlan_aware`, this is the default vlan id.  Required if
@@ -203,6 +206,7 @@ systemd system with minimal effort.
 * `network_vlans`: Create a vlan interface attached to a vlan-aware bridge
   in order for the host to be able to participate in the VLAN.
   * `name`: Interface name to assign for vlan. Required.
+  * `ifname`: Ethernet Interface, Bridge, or Bond to attach vlan to. Required.
   * `vlan`: VLAN id to associate with interface.
   * `mtu`: MTU. Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
   * `dhcp`: Default `false`. Set to true to use dhcp (also enables ipv6 RA).

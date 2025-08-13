@@ -10,3 +10,19 @@ Name={{ interface.ifname }}
 
 [Network]
 Bridge={{ config.name }}
+{% if interface.vlans is defined %}
+{%   if not config.vlan_aware|default(true) %}
+{{ notdefined | mandatory(msg='bridge is not vlan aware, cannot specify vlans') }}
+{%   endif %}
+{%   for vlan in vlans %}
+
+[BridgeVLAN]
+VLAN={{ vlan }}
+{%   endfor %}
+{% endif %}
+{% if interface.pvid is defined %}
+
+[BridgeVLAN]
+PVID={{ interface.pvid }}
+EgressUntagged={{ interface.pvid }}
+{% endif %}

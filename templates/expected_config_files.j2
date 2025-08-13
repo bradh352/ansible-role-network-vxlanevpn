@@ -23,17 +23,17 @@
 {% for bridge in network_bridges|default([]) %}
 {%   do files.append("30-bridge-" ~ bridge.name ~ ".netdev") %}
 {%   for interface in bridge.interfaces|default([]) %}
-{%     do files.append("50-" ~ (interface.ifname if interface.ifname is defined else 'iface' ~ loop.index0) ~ "-bridge-" ~ bridge.name ~ ".network") %}
+{%     do files.append("50-" ~ (interface.ifname if interface.ifname is defined else 'iface' ~ loop.index0) ~ "-attachedto-" ~ bridge.name ~ ".network") %}
 {%   endfor %}
 {%   do files.append("60-bridge-" ~ bridge.name ~ ".network") %}
 {% endfor %}
 {% for vlan in network_vlans|default([]) %}
-{%   do files.append("40-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ "-bridge-" ~ vlan.bridge ~ ".netdev") %}
-{%   do files.append("60-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ "-bridge-" ~ vlan.bridge ~ ".network") %}
+{%   do files.append("40-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ "-attachedto-" ~ vlan.ifname ~ ".netdev") %}
+{%   do files.append("60-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ "-attachedto-" ~ vlan.ifname ~ ".network") %}
 {% endfor %}
 {% for vxlan in network_vxlans|default([]) %}
 {%   do files.append("40-vxlan" ~ vxlan.vni ~ ".netdev") %}
-{%   do files.append("50-vxlan" ~ vxlan.vni ~ ('-vlan' ~ vxlan.vlan if vxlan.vlan is defined else '') ~ "-bridge-" ~ vxlan.bridge ~ ".network") %}
+{%   do files.append("50-vxlan" ~ vxlan.vni ~ ('-vlan' ~ vxlan.vlan if vxlan.vlan is defined else '') ~ "-attachedto-" ~ vxlan.ifname ~ ".network") %}
 {% endfor %}
 {% if vxlan_vlan_bridge %}
 {%   do files.append("30-vxlan0.netdev") %}

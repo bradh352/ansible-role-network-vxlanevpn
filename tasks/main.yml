@@ -255,7 +255,7 @@
 - name: "Networkd: NetDev: vlan"
   template:
     src: "networkd.netdev.vlan.j2"
-    dest: "/etc/systemd/network/40-vlan{{config.vlan}}-{{ config.name }}-bridge-{{ config.bridge }}.netdev"
+    dest: "/etc/systemd/network/40-vlan{{config.vlan}}-{{ config.name }}-attachedto-{{ config.ifname }}.netdev"
   vars:
     config: "{{ item }}"
   loop: "{{ network_vlans }}"
@@ -296,7 +296,7 @@
 - name: "Networkd: Network: vxlan"
   template:
     src: "networkd.network.vxlan.j2"
-    dest: "/etc/systemd/network/50-vxlan{{ config.vni }}{{ '-vlan' ~ config.vlan if config.vlan is defined else '' }}-bridge-{{ config.bridge }}.network"
+    dest: "/etc/systemd/network/50-vxlan{{ config.vni }}{{ '-vlan' ~ config.vlan if config.vlan is defined else '' }}-attachedto-{{ config.ifname }}.network"
   vars:
     config: "{{ item }}"
   loop: "{{ network_vxlans }}"
@@ -355,7 +355,7 @@
 - name: "Networkd: Network: bridge iface"
   template:
     src: "networkd.network.bridge_iface.j2"
-    dest: "/etc/systemd/network/50-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}-bridge-{{ config.name }}.network"
+    dest: "/etc/systemd/network/50-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}-attachedto-{{ config.name }}.network"
   vars:
     config: "{{ item.config }}"
     interface: "{{ item.interface }}"
@@ -374,7 +374,7 @@
 - name: "Networkd: Network: vlans"
   template:
     src: "networkd.network.j2"
-    dest: "/etc/systemd/network/60-vlan{{config.vlan}}-{{ config.name }}-bridge-{{ config.bridge }}.network"
+    dest: "/etc/systemd/network/60-vlan{{config.vlan}}-{{ config.name }}-attachedto-{{ config.ifname }}.network"
   vars:
     config: "{{ item }}"
     type: "vlan"
