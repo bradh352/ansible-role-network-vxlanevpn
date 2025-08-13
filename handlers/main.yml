@@ -5,7 +5,6 @@
     msg: "rebooting now"
     connect_timeout: 10
     post_reboot_delay: 60
-  when: networkd.changed
   throttle: 1
   listen: network_vxlanevpn_reboot
 
@@ -18,7 +17,6 @@
   ansible.builtin.setup:
     gather_subset:
       - network
-  when: networkd.changed
   listen: network_vxlanevpn_reboot
 
 - name: network_restart
