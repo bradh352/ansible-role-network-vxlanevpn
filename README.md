@@ -278,13 +278,13 @@ network_underlay_mtu: 9100
 network_vxlans:
   - vni: 100
     mtu: 9000
-    bridge: "hypervisor"
+    ifname: "hypervisor"
   - vni: 200
     mtu: 9000
-    bridge: "ceph"
+    ifname: "ceph"
   - vni: 2
     mtu: 1500
-    bridge: "public"
+    ifname: "public"
 network_bridges:
   - name: "hypervisor"
     stp: false
@@ -379,16 +379,16 @@ network_vlans:
     addresses:
       - "172.18.0.2/24" # This matches `network_underlay_srcip` above
     mtu: 9100
-    bridge: "br0"
+    ifname: "br0"
 network_vxlans:
   - vni: 100
     mtu: 9000
-    bridge: "hypervisor"
+    ifname: "hypervisor"
   - vni: 200
     mtu: 9000
-    bridge: "ceph"
+    ifname: "ceph"
   - vni: 2
     mtu: 1500
-    bridge: "public"
+    ifname: "public"
 ```
 
