@@ -6,10 +6,13 @@ Original Repository: https://github.com/bradh352/ansible-role-network-vxlanevpn
 
 ## Overview
 
-This role is used to configure a Linux host for networking.  This role supports
-all the various common networking setup you might expect such as network
-interfaces, vlans, bonds, and bridges.  In addition, it supports VXLAN EVPN
-for those wanting to participate in a pure Layer3 VXLAN EVPN network.
+This role is used to configure a Linux host for networking.  It has a base
+expectation that it is controlling the entirety of the network configuration.
+Any manual configuartion will be removed.
+
+This role supports all the various common networking setup you might expect such
+as network interfaces, vlans, bonds, and bridges.  In addition, it supports
+VXLAN EVPN for those wanting to participate in a pure Layer3 VXLAN EVPN network.
 
 When using VXLAN EVPN, the underlay can be provisioned using BGP Unnnumbered
 (using only link-local ip addresses) when the upstream switch is participating
@@ -162,6 +165,15 @@ systemd system with minimal effort.
   * `interfaces`: List of interfaces in the bridge. Must specify one of (and
     only one of) `ifname`, `pattern`, `macaddr`, or `driver` for interface
     matching.
+    ***NOTE***: It is not recommended to reference an interface that is also
+      referenced under `network_interfaces`, and not allowed for interfaces
+      under listed under `network_bonds`.  The only reason one might reference
+      the same interface under this section *and* `network_interfaces` might
+      be if breaking out VLANs on the raw interface, but then adding the base
+      untagged interface to a non-vlan-aware bridge.  This is a highly unusual
+      usecase and other options should be evaluated if at all possible (for
+      instance, the MTU will be inherited from the interfaces regardless of what
+      is specified here).
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  May also
       include the name of a bond or vlan created.
     * `pattern`: Regex pattern to match on interface name. e.g. `ens.*`, `ens[23]`.
