@@ -498,6 +498,23 @@
     enabled: true
   when: network_vtep_ip is defined
 
+- name: "Find stale system netplan files"
+  find:
+    paths: /etc/netplan
+    file_type: file
+  register: netplan_files
+
+- name: "Delete unused netplan configuration files"
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  with_items: "{{ netplan_files['files'] }}"
+
+- name: "ensure cloud init doesn't have network config"
+  file:
+    path: "/etc/cloud/cloud.cfg.d/50-curtin-networking.cfg"
+    state: absent
+
 - name: "UFW: allow BGP unnumbered"
   community.general.ufw:
     rule: allow
