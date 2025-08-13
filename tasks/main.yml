@@ -40,7 +40,7 @@
         pkg:
           - frr
         state: present
-      notify: reboot
+      notify: network_vxlanevpn_reboot
 
     # FRR 8.4.4 in Ubuntu 24.04 has an issue resolved by https://github.com/FRRouting/frr/pull/12524
     - name: "Check installed FRR version"
@@ -103,7 +103,7 @@
       val: "yes"
     - key: "bfdd"
       val: "yes"
-  notify: reboot
+  notify: network_vxlanevpn_reboot
   when: network_vtep_ip is defined
 
 - name: "Validate configuration"
@@ -166,7 +166,7 @@
     file_type: file
   register: networkd_files
   changed_when: networkd_files["files"] | length == 0
-  notify: reboot
+  notify: network_vxlanevpn_reboot
 
 - name: "Networkd: Link: ethernet interfaces"
   template:

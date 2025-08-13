@@ -7,9 +7,9 @@
     post_reboot_delay: 60
   when: networkd.changed
   throttle: 1
-  listen: reboot
+  listen: network_vxlanevpn_reboot
 
-- name: sysctl-restart
+- name: sysctl_restart
   service:
     name: systemd-sysctl
     state: restarted
@@ -19,7 +19,7 @@
     gather_subset:
       - network
   when: networkd.changed
-  listen: reboot
+  listen: network_vxlanevpn_reboot
 
 - name: network_restart
   include_tasks: "tasks/network_restart.yml"
