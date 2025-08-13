@@ -4,6 +4,9 @@
 [Match]
 Name=vxlan{{ config.vni }}
 
+[Link]
+MTUBytes={{ config.mtu | default(1500) }}
+
 [Network]
 {% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
 {% if config.ifname not in bridge_ifnames %}
@@ -13,6 +16,7 @@ Bridge={{ config.ifname }}
 {% set vlan_aware = network_bridges | selectattr('name', 'equalto', config.ifname) | map(attribute='vlan_aware') | list | first | default(true) %}
 {% if vlan_aware %}
 {%   if config.vlan is defined %}
+ConfigureWithoutCarrier=yes
 
 [BridgeVLAN]
 VLAN={{ config.vlan }}

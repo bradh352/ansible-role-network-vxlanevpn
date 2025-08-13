@@ -2,6 +2,7 @@
 {#   - config: general configuration for bridge #}
 [NetDev]
 Name={{ config.name }}
+MTUBytes={{ config.mtu | default(9000) }}
 Kind=bridge
 
 [Bridge]

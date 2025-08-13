@@ -15,17 +15,36 @@ Type=vlan
 MTUBytes={{ config.mtu | default(9000 if type == "bridge" else 1500) }}
 
 [Network]
+{# ------ ATTACH VXLANS ------ #}
 {% for vlan in network_vlans|default([]) %}
 {%   if vlan.ifname == config.name | default(config.ifname) %}
 VLAN={{ vlan.name }}
 {%   endif %}
 {% endfor %}
+{# ------ ATTACH VLANS ------ #}
 {% for vxlan in network_vxlans|default([]) %}
 {%   if vxlan.ifname == config.name | default(config.ifname) %}
 VXLAN=vxlan{{ vxlan.vni }}
 {%   endif %}
 {% endfor %}
-{% if type == "bridge" and config.vlan_aware|default(true) %}
+{# ------ ATTACH TO BRIDGE ------ #}
+{% set is_bridge_interface = false %}
+{% if type != "bridge" %}
+{%   if config.name | default(config.ifname) in network_bridge_iface_names %}
+{%     set is_bridge_interface = true %}
+{%   endif %}
+{% endif %}
+{% if is_bridge_interface %}
+{%   for bridge in network_bridges|default([]) %}
+{%     for interface in bridge.interfaces|default([]) %}
+{%       if config.name | default(config.iface) == interface.ifname|default("") %}
+Bridge={{ bridge.name }}
+{%       endif %}
+{%     endfor %}
+{%   endfor %}
+{% endif %}
+{# ------- DISABLE ASSIGNMENT OF ADDRESSES TO BRIDGE INTERFACES AND VLAN-AWARE BRIDGES ------ #}
+{% if (type == "bridge" and config.vlan_aware|default(true)) or is_bridge_interface %}
 DHCP=no
 LinkLocalAddressing=no
 LLDP=no
@@ -33,6 +52,7 @@ EmitLLDP=no
 IPv6AcceptRA=no
 IPv6SendRA=no
 {% else %}
+{# ------ ADD ADDRESS INFORMATION ------ #}
 KeepConfiguration=yes
 LinkLocalAddressing=ipv6
 {%   if config.dhcp|default(false) %}

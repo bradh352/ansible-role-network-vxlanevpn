@@ -118,9 +118,26 @@
   set_fact:
     network_bridge_names: "{{ network_bridges|default([]) | map(attribute='name') | list }}"
 
+- name: "Cache bridge interface names"
+  set_fact:
+    network_bridge_iface_names: >-
+      {%- set items = [] %}
+      {%- for bridge in network_bridges|default([]) %}
+      {%-   for interface in bridge.interfaces|default([]) %}
+      {%-     if interface.ifname is defined %}
+      {%-       do items.append(interface.ifname) %}
+      {%-     endif %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+
 - name: "Cache vlan names"
   set_fact:
     network_vlan_names: "{{ network_vlans|default([]) | map(attribute='name') | list }}"
+
+- name: "Cache interface names"
+  set_fact:
+    network_interface_names: "{{ (network_interfaces|default([]) | selectattr('name', 'defined') | map(attribute='name') | list) + (network_interfaces|default([]) | rejectattr('name', 'defined') | map(attribute='ifname') | list) }}"
 
 - name: "See if vxlan is using vlan aware bridging"
   set_fact:
@@ -196,7 +213,7 @@
       {%- set items = [] %}
       {%- for bridge in network_bridges %}
       {%-   for interface in bridge.interfaces|default([]) %}
-      {%-     if interface.ifname|default("") not in network_bond_names %}
+      {%-     if interface.ifname|default("") not in network_bond_names + network_vlan_names + network_interface_names %}
       {%-       do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
       {%-     endif %}
       {%-   endfor %}

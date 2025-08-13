@@ -23,6 +23,9 @@
 {% for bridge in network_bridges|default([]) %}
 {%   do files.append("30-bridge-" ~ bridge.name ~ ".netdev") %}
 {%   for interface in bridge.interfaces|default([]) %}
+{%     if interface.ifname|default("") not in network_bond_names + network_vlan_names + network_interface_names %}
+{%       do files.append("10-bridge-" ~ bridge.name ~ (interface.ifname if interface.ifname is defined else 'iface' ~ loop.index0) ~ ".link") %}
+{%     endif %}
 {%     do files.append("50-" ~ (interface.ifname if interface.ifname is defined else 'iface' ~ loop.index0) ~ "-attachedto-" ~ bridge.name ~ ".network") %}
 {%   endfor %}
 {%   do files.append("60-bridge-" ~ bridge.name ~ ".network") %}
@@ -39,4 +42,4 @@
 {%   do files.append("30-vxlan0.netdev") %}
 {%   do files.append("40-vxlan0.network") %}
 {% endif %}
-{{- files -}}
+{{- files | sort -}}
