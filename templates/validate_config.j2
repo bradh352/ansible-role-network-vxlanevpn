@@ -1,8 +1,5 @@
 {% import 'macros/ip_funcs.j2' as ipfn %}
 {# ----- Collect all known interface names from configuration ---- #}
-{% set bond_ifnames = network_bonds|default([]) | map(attribute='name') | list %}
-{% set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
-{% set vlan_ifnames = network_vlans|default([]) | map(attribute='name') | list %}
 {% set ether_ifnames = [] %}
 {# Handle the possibility that the the configuration is renaming an interface #}
 {% for interface in network_interfaces|default([]) %}
@@ -14,7 +11,7 @@
 {# ----- Validate underlay interface names ---- #}
 BGP Unnumbered Underlay Interfaces:
 {% for interface in network_underlay_interfaces|default([]) %}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=bond_ifnames + bridge_ifnames + ether_ifnames + vlan_ifnames) %}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=network_bond_names + network_bridge_names + ether_ifnames + network_vlan_names) %}
   iface {{ loop.index }}: {{ ifnames }}
 {% endfor %}
 {# ----- Validate bond interface names ---- #}
@@ -29,7 +26,7 @@ Bond Interfaces:
 Bridge Interfaces:
 {% for bridge in network_bridges|default([]) %}
 {%   for interface in bridge.interfaces|default([]) %}
-{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=bond_ifnames + vlan_ifnames) %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=network_bond_names + network_vlan_names) %}
   {{ bridge.name }}.{{ loop.index0 }}: {{ ifnames }}
 {%   endfor %}
 {% endfor %}
@@ -43,7 +40,7 @@ Ethernet Interfaces:
 {# ----- Validate vlan interface names ---- #}
 VLAN Interfaces:
 {% for interface in network_vlans|default([]) %}
-{%   if interface.ifname not in ether_ifnames + bond_ifnames + bridge_ifnames %}
+{%   if interface.ifname not in ether_ifnames + network_bond_names + network_bridge_names + network_interface_names %}
 {{ notdefined | mandatory(msg='vlan ' ~ interface.name ~ 'id ' ~ interface.vlan ~ 'master ' ~ interface.ifname ~ ' does not exist') }}
 {%   endif %}
   {{ interface.name }}: {{ interface.ifname }}
