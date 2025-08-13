@@ -1,0 +1,99 @@
+{# General network configuration.  Depends on these variables: #}
+{#  - config: dictionary containing configuration #}
+{#  - type: eth, bond, vlan, or bridge #}
+[Match]
+{% if type == "eth" %}
+Name={{ config.name|default(config.ifname) }}
+{% else %}
+Name={{ config.name }}
+{% endif %}
+{% if type == "vlan" %}
+Type=vlan
+{% endif %}
+
+[Link]
+MTUBytes={{ config.mtu | default(9000 if type == "bridge" else 1500) }}
+
+[Network]
+{# ------ ATTACH VLANS ------ #}
+{% for vlan in network_vlans|default([]) %}
+{%   if vlan.ifname == config.name | default(config.ifname) %}
+VLAN={{ vlan.name }}
+{%   endif %}
+{% endfor %}
+{# ------ ATTACH VXLANS ------ #}
+{% if type == "bridge" and config.vlan_aware|default(true) %}
+{%   for vxlan in network_vxlans|default([]) %}
+{%     if vxlan.ifname == config.name | default(config.ifname) %}
+VXLAN=vxlan{{ vxlan.vni }}
+{%     endif %}
+{%   endfor %}
+{% endif %}
+{# ------ ATTACH INTERFACE TO BRIDGE ------ #}
+{% set is_bridge_interface = false %}
+{% if type != "bridge" %}
+{%   if config.name | default(config.ifname) in network_bridge_iface_names %}
+{%     set is_bridge_interface = true %}
+{%   endif %}
+{% endif %}
+{% if is_bridge_interface %}
+{%   for bridge in network_bridges|default([]) %}
+{%     for interface in bridge.interfaces|default([]) %}
+{%       if config.name | default(config.iface) == interface.ifname|default("") %}
+Bridge={{ bridge.name }}
+{%       endif %}
+{%     endfor %}
+{%   endfor %}
+{% endif %}
+{# ------- DISABLE ASSIGNMENT OF ADDRESSES TO BRIDGE INTERFACES AND VLAN-AWARE BRIDGES ------ #}
+{% if (type == "bridge" and config.vlan_aware|default(true)) or is_bridge_interface %}
+DHCP=no
+LinkLocalAddressing=no
+LLDP=no
+EmitLLDP=no
+IPv6AcceptRA=no
+IPv6SendRA=no
+ConfigureWithoutCarrier=yes
+{% else %}
+{# ------ ADD ADDRESS INFORMATION ------ #}
+KeepConfiguration=yes
+LinkLocalAddressing=ipv6
+{%   if config.dhcp|default(false) %}
+IPv6AcceptRA=yes
+DHCP=ipv4
+{%   else %}
+IPv6AcceptRA=no
+DHCP=no
+{%     for address in config.addresses|default([]) %}
+Address={{ address }}
+{%     endfor %}
+{%   endif %}
+{%   for nameserver in config.nameservers.addresses|default([]) %}
+DNS={{ nameserver }}
+{%   endfor %}
+{%   if config.nameservers.domains is defined %}
+Domains={{ config.nameservers.domains | join(" ") }}
+{%   endif %}
+{% endif %}
+
+{% for route in config.routes|default([]) %}
+[Route]
+Destination={{ route.to }}
+Gateway={{ route.via }}
+{% endfor %}
+
+{# Disable DHCPv4 and IPv6 RA learning of DNS, NTP, and default gateway #}
+{% if config.dhcp|default(false) and not config.dhcp_allow_learning|default(true) %}
+[DHCPv4]
+UseDNS=no
+UseNTP=no
+UseDomains=no
+UseRoutes=no
+UseGateway=no
+
+[IPv6AcceptRA]
+UseDNS=no
+UseDomains=no
+UseGateway=no
+UseRoutePrefix=no
+{% endif %}

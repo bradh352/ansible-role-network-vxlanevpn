@@ -1,0 +1,7 @@
+{# Requires variables: #}
+{#   - config: general configuration for bond #}
+{#   - interface: specific interface #}
+{% include "networkd.network.match.j2" %}
+
+[Network]
+Bond={{ config.name }}

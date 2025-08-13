@@ -1,15 +1,46 @@
 #!/bin/bash
+{% import 'macros/ip_funcs.j2' as ipfn %}
 case "$IFACE" in
-{% for interface in network_vxlanevpn_interfaces|default([]) %}
-    {{ interface.ifname }})
-      ethtool --set-fec {{ interface.ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
-      ethtool -s {{ interface.ifname }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
+{# ------ VXLAN UNDERLAY PHYSICAL INTERFACES ------ #}
+{% for interface in network_underlay_interfaces|default([]) %}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, network_bond_names + network_bridge_names + network_vlan_names) | from_yaml %}
+{%   for ifname in ifnames %}
+{%     if ifname not in network_bond_names + network_bridge_names + network_vlan_names %}
+    {{ ifname }})
+      ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
       ;;
+{%     endif %}
+{%   endfor %}
 {% endfor %}
+{# ------ BOND PHYSICAL ETHERNET INTERFACES ------ #}
+{% for bond in network_bonds|default([]) %}
+{%   for interface in bond.interfaces %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
+{%     for ifname in ifnames %}
+    {{ ifname }})
+      ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
+      ;;
+{%     endfor %}
+{%   endfor %}
+{% endfor %}
+{# ------ BRIDGE PHYSICAL ETHERNET INTERFACES ------ #}
+{% for bridge in network_bridges|default([]) %}
+{%   for interface in bridge.interfaces|default([]) %}
+{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, network_bond_names + network_vlan_names + network_interface_names) | from_yaml %}
+{%     for ifname in ifnames %}
+{%       if ifname not in network_bond_names + network_vlan_names + network_interface_names %}
+    {{ ifname }})
+      ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
+      ;;
+{%       endif %}
+{%     endfor %}
+{%   endfor %}
+{% endfor %}
+{# ------ PHYSICAL ETHERNET INTERFACES ------ #}
 {% for interface in network_interfaces|default([]) %}
-    {{ interface.if_name }})
-      ethtool --set-fec {{ interface.if_name }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
-      ethtool -s {{ interface.if_name }} duplex full {{ 'speed ' ~ interface.speed|default(0) if interface.speed is defined else '' }} autoneg {{ 'on' if interface.autonegotiation|default(true) else 'off' }}
+{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
+    {{ ifnames[0] }})
+      ethtool --set-fec {{ ifnames[0] }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
       ;;
 {% endfor %}
     *)
