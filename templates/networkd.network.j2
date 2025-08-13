@@ -19,24 +19,36 @@ MTUBytes={{ config.mtu | default(9000 if type == "bridge" else 1500) }}
 {%   for vlan in network_vlans|default([]) %}
 VLAN={{ vlan.name }}
 {%   endfor %}
-{% endif %}
-KeepConfiguration=yes
-LinkLocalAddressing=ipv6
-{% if config.dhcp|default(false) %}
-IPv6AcceptRA=yes
-DHCP=ipv4
-{% else %}
-IPv6AcceptRA=no
-DHCP=no
-{%   for address in config.addresses|default([]) %}
-Address={{ address }}
+{%   for vxlan in network_vxlans|default([]) %}
+VXLAN=vxlan{{ vxlan.vni }}
 {%   endfor %}
 {% endif %}
-{% for nameserver in config.nameservers.addresses|default([]) %}
+{% if type == "bridge" and config.vlan_aware|default(true) %}
+DHCP=no
+LinkLocalAddressing=no
+LLDP=no
+EmitLLDP=no
+IPv6AcceptRA=no
+IPv6SendRA=no
+{% else %}
+KeepConfiguration=yes
+LinkLocalAddressing=ipv6
+{%   if config.dhcp|default(false) %}
+IPv6AcceptRA=yes
+DHCP=ipv4
+{%   else %}
+IPv6AcceptRA=no
+DHCP=no
+{%     for address in config.addresses|default([]) %}
+Address={{ address }}
+{%     endfor %}
+{%   endif %}
+{%   for nameserver in config.nameservers.addresses|default([]) %}
 DNS={{ nameserver }}
-{% endfor %}
-{% if config.nameservers.domains is defined %}
+{%   endfor %}
+{%   if config.nameservers.domains is defined %}
 Domains={{ config.nameservers.domains | join(" ") }}
+{%   endif %}
 {% endif %}
 
 {% for route in config.routes|default([]) %}

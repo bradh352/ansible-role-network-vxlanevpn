@@ -1,0 +1,10 @@
+[NetDev]
+Name=vxlan0
+Kind=vxlan
+
+[VXLAN]
+External=true
+VNIFilter=true
+Local={{ network_vtep_ip|split('/')|first }}
+MacLearning=false
+DestinationPort=4789

@@ -114,6 +114,18 @@
   set_fact:
     network_bond_names: "{{ network_bonds|default([]) | map(attribute='name') | list }}"
 
+- name: "Cache bridge names"
+  set_fact:
+    network_bridge_names: "{{ network_bridges|default([]) | map(attribute='name') | list }}"
+
+- name: "Cache vlan names"
+  set_fact:
+    network_vlan_names: "{{ network_vlans|default([]) | map(attribute='name') | list }}"
+
+- name: "See if vxlan is using vlan aware bridging"
+  set_fact:
+    vxlan_vlan_bridge: "{{ true if network_vxlans | default([]) | map(attribute='vlan') | select('defined') | list | length > 0 else false }}"
+
 - name: "Set Expected Configuration Files"
   set_fact:
     expected_config_files: "{{ lookup('template', 'expected_config_files.j2') | from_yaml }}"
@@ -156,12 +168,18 @@
     src: "networkd.link.j2"
     dest: "/etc/systemd/network/10-underlay-iface{{ index }}.link"
   vars:
-    interface: "{{ item }}"
-    config: "{{ item }}"
+    interface: "{{ item.interface }}"
+    config: "{{ item.config }}"
+    index: "{{ item.iface_index }}"
     defaultmtu: 9100
-  loop: "{{ network_underlay_interfaces }}"
-  loop_control:
-    index_var: index
+  loop: >-
+      {%- set items = [] %}
+      {%- for interface in network_underlay_interfaces %}
+      {%-   if interface.ifname|default("") not in network_bond_names + network_bridge_names + network_vlan_names %}
+      {%-     do items.append({ 'interface': interface, 'config': interface, 'iface_index': loop.index0 }) %}
+      {%-   endif %}
+      {%- endfor %}
+      {{- items -}}
   when: network_underlay_interfaces is defined
   notify: network_restart
 
@@ -237,11 +255,25 @@
 - name: "Networkd: NetDev: vlan"
   template:
     src: "networkd.netdev.vlan.j2"
-    dest: "/etc/systemd/network/40-bridge-{{ config.bridge }}-vlan{{config.vlan}}-{{ config.name }}.netdev"
+    dest: "/etc/systemd/network/40-vlan{{config.vlan}}-{{ config.name }}-bridge-{{ config.bridge }}.netdev"
   vars:
     config: "{{ item }}"
   loop: "{{ network_vlans }}"
   when: network_vlans is defined
+  notify: network_restart
+
+- name: "Networkd: NetDev: vxlan0"
+  template:
+    src: "networkd.netdev.vxlan0.j2"
+    dest: "/etc/systemd/network/30-vxlan0.netdev"
+  when: vxlan_vlan_bridge
+  notify: network_restart
+
+- name: "Networkd: Network: vxlan0"
+  template:
+    src: "networkd.network.vxlan0.j2"
+    dest: "/etc/systemd/network/40-vxlan0.network"
+  when: vxlan_vlan_bridge
   notify: network_restart
 
 - name: "Networkd: NetDev: vxlan"
@@ -264,7 +296,7 @@
 - name: "Networkd: Network: vxlan"
   template:
     src: "networkd.network.vxlan.j2"
-    dest: "/etc/systemd/network/50-bridge-{{ config.bridge }}-vxlan{{ config.vni }}{{ '-vlan' ~ config.vlan if config.vlan is defined else '' }}.network"
+    dest: "/etc/systemd/network/50-vxlan{{ config.vni }}{{ '-vlan' ~ config.vlan if config.vlan is defined else '' }}-bridge-{{ config.bridge }}.network"
   vars:
     config: "{{ item }}"
   loop: "{{ network_vxlans }}"
@@ -287,11 +319,17 @@
     src: "networkd.network.underlay.j2"
     dest: "/etc/systemd/network/10-underlay-iface{{ index }}.network"
   vars:
-    config: "{{ item }}"
-    interface: "{{ item }}"
-  loop: "{{ network_underlay_interfaces }}"
-  loop_control:
-    index_var: index
+    config: "{{ item.interface }}"
+    interface: "{{ item.config }}"
+    index: "{{ item.iface_index }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for interface in network_underlay_interfaces %}
+      {%-   if interface.ifname|default("") not in network_bond_names + network_bridge_names + network_vlan_names %}
+      {%-     do items.append({ 'interface': interface, 'config': interface, 'iface_index': loop.index0 }) %}
+      {%-   endif %}
+      {%- endfor %}
+      {{- items -}}
   when: network_underlay_interfaces is defined
   notify: network_restart
 
@@ -317,7 +355,7 @@
 - name: "Networkd: Network: bridge iface"
   template:
     src: "networkd.network.bridge_iface.j2"
-    dest: "/etc/systemd/network/50-bridge-{{ config.name }}-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}.network"
+    dest: "/etc/systemd/network/50-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}-bridge-{{ config.name }}.network"
   vars:
     config: "{{ item.config }}"
     interface: "{{ item.interface }}"
@@ -336,7 +374,7 @@
 - name: "Networkd: Network: vlans"
   template:
     src: "networkd.network.j2"
-    dest: "/etc/systemd/network/60-bridge-{{ config.bridge }}-vlan{{config.vlan}}-{{ config.name }}.network"
+    dest: "/etc/systemd/network/60-vlan{{config.vlan}}-{{ config.name }}-bridge-{{ config.bridge }}.network"
   vars:
     config: "{{ item }}"
     type: "vlan"

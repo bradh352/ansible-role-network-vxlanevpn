@@ -1,0 +1,11 @@
+[Match]
+Name=vxlan0
+
+#[Link]
+#MTUBytes=9000
+
+[Network]
+Bridge={{ network_vxlans | selectattr("vlan") | map(attribute="bridge") | first }}
+
+[Bridge]
+VLANTunnel=true

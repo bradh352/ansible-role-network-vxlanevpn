@@ -69,7 +69,6 @@ systemd system with minimal effort.
   the largest `network_vxlans` mtu.
 * `network_vxlans`: List of vxlan VNIs to associate with the host.  These must
   be attached to a bridge for the host to use them.
-  * `name`: Interface name to assign
   * `vni`: VXLAN vni (`1` to `16777215`). Required.
   * `bridge`: Bridge to attach vlan to. Required.
   * `vlan`: VLAN to assign to local bridge. Required if bridge is vlan aware.

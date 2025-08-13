@@ -8,7 +8,15 @@ Kind=vxlan
 
 [VXLAN]
 VNI={{ config.vni }}
+{# If using a vlan-aware bridge, we are using vxlan0 to contain this info #}
+{% if config.vlan is defined %}
 Local={{ network_vtep_ip|split('/')|first }}
 MacLearning=false
 DestinationPort=4789
 Independent=true
+{% endif %}
+
+{% if config.vlan is defined %}
+[VLAN]
+Id={{ config.vlan }}
+{% endif %}
