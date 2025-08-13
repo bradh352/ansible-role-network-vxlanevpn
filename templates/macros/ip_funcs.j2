@@ -1,10 +1,10 @@
-{% macro resolve_ifnames(ansible_facts, interface, extra_ifnames=[], validate_ifname=true) -%}
+{% macro resolve_ifnames(debug_prefix, ansible_facts, interface, extra_ifnames=[], validate_ifname=true) -%}
 {# This macro takes in a dictionary with one of ifname, macaddr, driver, or pattern specified #}
 {# and outputs an array of matching interface names #}
 {%   set iface_list = [] %}
 {%   if interface.ifname is defined %}
 {%     if not interface.ifname in ansible_facts.interfaces and not interface.ifname in extra_ifnames and validate_ifname %}
-{{ notdefined | mandatory(msg='interface, bond, or bridge with ifname ' + interface.ifname + ' not found') }}
+{{ notdefined | mandatory(msg=debug_prefix ~ ': interface, bond, or bridge with ifname ' + interface.ifname + ' not found') }}
 {%     endif %}
 {%     do iface_list.append(interface.ifname) %}
 {%   elif interface.macaddr is defined %}
@@ -14,7 +14,7 @@
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
-{{ notdefined | mandatory(msg='interface with macaddr ' + interface.macaddr + ' not found') }}
+{{ notdefined | mandatory(msg=debug_prefix ~ ': interface with macaddr ' + interface.macaddr + ' not found') }}
 {%     endif %}
 {%   elif interface.driver is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
@@ -23,7 +23,7 @@
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
-{{ notdefined | mandatory(msg='interface with driver ' + interface.driver + ' not found') }}
+{{ notdefined | mandatory(msg=debug_prefix ~ ': interface with driver ' + interface.driver + ' not found') }}
 {%     endif %}
 {%   elif interface.pattern is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
@@ -32,10 +32,10 @@
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
-{{ notdefined | mandatory(msg='interface with pattern ' + interface.pattern + ' not found') }}
+{{ notdefined | mandatory(msg=debug_prefix ~ ': interface with pattern ' + interface.pattern + ' not found') }}
 {%     endif %}
 {%   else %}
-{{ notdefined | mandatory(msg='interface must include one of ifname, macaddr, driver, or pattern') }}
+{{ notdefined | mandatory(msg=debug_prefix ~ ': interface must include one of ifname, macaddr, driver, or pattern') }}
 {%   endif %}
 {{- iface_list | sort -}}
 {% endmacro -%}

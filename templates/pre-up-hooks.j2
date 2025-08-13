@@ -3,7 +3,7 @@
 case "$IFACE" in
 {# ------ VXLAN UNDERLAY PHYSICAL INTERFACES ------ #}
 {% for interface in network_underlay_interfaces|default([]) %}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, network_bond_names + network_bridge_names + network_vlan_names) | from_yaml %}
+{%   set ifnames = ipfn.resolve_ifnames('network_underlay_interfaces[' ~ loop.index0 ~ ']', ansible_facts, interface, network_bond_names + network_bridge_names + network_vlan_names) | from_yaml %}
 {%   for ifname in ifnames %}
 {%     if ifname not in network_bond_names + network_bridge_names + network_vlan_names %}
     {{ ifname }})
@@ -14,8 +14,9 @@ case "$IFACE" in
 {% endfor %}
 {# ------ BOND PHYSICAL ETHERNET INTERFACES ------ #}
 {% for bond in network_bonds|default([]) %}
+{%   set outer_index=loop.index0 %}
 {%   for interface in bond.interfaces %}
-{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
+{%     set ifnames = ipfn.resolve_ifnames('network_bonds[' ~ outer_index ~ '][' ~ loop.index0 ~ ']', ansible_facts, interface) | from_yaml %}
 {%     for ifname in ifnames %}
     {{ ifname }})
       ethtool --set-fec {{ ifname }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
@@ -25,8 +26,9 @@ case "$IFACE" in
 {% endfor %}
 {# ------ BRIDGE PHYSICAL ETHERNET INTERFACES ------ #}
 {% for bridge in network_bridges|default([]) %}
+{%   set outer_index=loop.index0 %}
 {%   for interface in bridge.interfaces|default([]) %}
-{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, network_bond_names + network_vlan_names + network_interface_names) | from_yaml %}
+{%     set ifnames = ipfn.resolve_ifnames('network_bridges[' ~ outer_index ~ '][' ~ loop.index0 ~ ']',ansible_facts, interface, network_bond_names + network_vlan_names + network_interface_names) | from_yaml %}
 {%     for ifname in ifnames %}
 {%       if ifname not in network_bond_names + network_vlan_names + network_interface_names %}
     {{ ifname }})
@@ -38,7 +40,7 @@ case "$IFACE" in
 {% endfor %}
 {# ------ PHYSICAL ETHERNET INTERFACES ------ #}
 {% for interface in network_interfaces|default([]) %}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) | from_yaml %}
+{%   set ifnames = ipfn.resolve_ifnames('network_interfaces[' ~ loop.index0 ~ ']', ansible_facts, interface) | from_yaml %}
     {{ ifnames[0] }})
       ethtool --set-fec {{ ifnames[0] }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
       ;;

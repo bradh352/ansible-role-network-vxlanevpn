@@ -11,14 +11,21 @@
 {# ----- Validate underlay interface names ---- #}
 BGP Unnumbered Underlay Interfaces:
 {% for interface in network_underlay_interfaces|default([]) %}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=network_bond_names + network_bridge_names + ether_ifnames + network_vlan_names) %}
+{%   if interface.ifname is not defined and interface.macaddr is not defined and interface.driver is not defined and interface.pattern is not defined %}
+{{ notdefined | mandatory(msg='network_underlay_interfaces[' ~ loop.index0 ~ '] must have ifname, macaddr, driver, or pattern specified') }}
+{%   endif %}
+{%   set ifnames = ipfn.resolve_ifnames('network_underlay_interfaces[' ~ loop.index0 ~ ']', ansible_facts, interface, extra_ifnames=network_bond_names + network_bridge_names + ether_ifnames + network_vlan_names) %}
   iface {{ loop.index }}: {{ ifnames }}
 {% endfor %}
 {# ----- Validate bond interface names ---- #}
 Bond Interfaces:
 {% for bond in network_bonds|default([]) %}
+{%   set outer_index=loop.index0 %}
 {%   for interface in bond.interfaces %}
-{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface) %}
+{%     if interface.ifname is not defined and interface.macaddr is not defined and interface.driver is not defined and interface.pattern is not defined %}
+{{ notdefined | mandatory(msg='network_bonds[' ~ outer_index ~ '] interface index ' ~ loop.index0 ~ ' must have ifname, macaddr, driver, or pattern specified') }}
+{%     endif %}
+{%     set ifnames = ipfn.resolve_ifnames('network_bonds[' ~ outer_index ~ '] interface index ' ~ loop.index0, ansible_facts, interface) %}
   {{ bond.name }}.{{ loop.index0 }}: {{ ifnames }}
 {%   endfor %}
 {% endfor %}
@@ -26,7 +33,11 @@ Bond Interfaces:
 Bridge Interfaces:
 {% for bridge in network_bridges|default([]) %}
 {%   for interface in bridge.interfaces|default([]) %}
-{%     set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, extra_ifnames=network_bond_names + network_vlan_names) %}
+{%     set outer_index=loop.index0 %}
+{%     if interface.ifname is not defined and interface.macaddr is not defined and interface.driver is not defined and interface.pattern is not defined %}
+{{ notdefined | mandatory(msg='network_bridges[' ~ outer_index ~ '] interface index ' ~ loop.index0 ~ ' must have ifname, macaddr, driver, or pattern specified') }}
+{%     endif %}
+{%     set ifnames = ipfn.resolve_ifnames('network_bridges[' ~ outer_index ~ '] interface index ' ~ loop.index0, ansible_facts, interface, extra_ifnames=network_bond_names + network_vlan_names) %}
   {{ bridge.name }}.{{ loop.index0 }}: {{ ifnames }}
 {%   endfor %}
 {% endfor %}
@@ -34,7 +45,10 @@ Bridge Interfaces:
 Ethernet Interfaces:
 {% for interface in network_interfaces|default([]) %}
 {# We can't guarantee the ifname exists if the user is renaming the interface, so turn off ifname validation #}
-{%   set ifnames = ipfn.resolve_ifnames(ansible_facts, interface, validate_ifname=false) %}
+{%   if interface.ifname is not defined and interface.macaddr is not defined and interface.driver is not defined and interface.pattern is not defined %}
+{{ notdefined | mandatory(msg='interfaces[' ~ loop.index0 ~ '] must have ifname, macaddr, driver, or pattern specified') }}
+{%   endif %}
+{%   set ifnames = ipfn.resolve_ifnames('interfaces[' ~ loop.index0 ~ ']', ansible_facts, interface, validate_ifname=false) %}
   {{ interface.name|default(interface.ifname) }}: {{ ifnames }}
 {% endfor %}
 {# ----- Validate vlan interface names ---- #}
