@@ -37,7 +37,7 @@ Bridge Interfaces:
 {%     if interface.ifname is not defined and interface.macaddr is not defined and interface.driver is not defined and interface.pattern is not defined %}
 {{ notdefined | mandatory(msg='network_bridges[' ~ outer_index ~ '] interface index ' ~ loop.index0 ~ ' must have ifname, macaddr, driver, or pattern specified') }}
 {%     endif %}
-{%     set ifnames = ipfn.resolve_ifnames('network_bridges[' ~ outer_index ~ '] interface index ' ~ loop.index0, ansible_facts, network_orig_iface_names, interface, extra_ifnames=network_bond_names + network_vlan_names) %}
+{%     set ifnames = ipfn.resolve_ifnames('network_bridges[' ~ outer_index ~ '] interface index ' ~ loop.index0, ansible_facts, network_orig_iface_names, interface, extra_ifnames=network_bond_names + network_vlan_names + network_interface_names) %}
   {{ bridge.name }}.{{ loop.index0 }}: {{ ifnames }}
 {%   endfor %}
 {% endfor %}
