@@ -1,7 +1,6 @@
 {% set files = [] %}
 {% if network_vtep_ip is defined %}
-{%   do files.append("10-vtep.netdev") %}
-{%   do files.append("10-vtep.network") %}
+{%   do files.append("10-lo.network") %}
 {% endif %}
 {% for iface in network_interfaces|default([]) %}
 {%   do files.append("10-eth-" ~ iface.name|default(iface.ifname) ~ ".link") %}

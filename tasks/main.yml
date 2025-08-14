@@ -251,13 +251,6 @@
   when: network_bonds is defined
   notify: network_restart
 
-- name: "Networkd: Netdev: VTEP interface"
-  template:
-    src: "networkd.netdev.vtep.j2"
-    dest: "/etc/systemd/network/10-vtep.netdev"
-  when: network_vtep_ip is defined
-  notify: network_restart
-
 - name: "Networkd: NetDev: bonds"
   template:
     src: "networkd.netdev.bond.j2"
@@ -312,10 +305,10 @@
   when: network_vxlans is defined
   notify: network_restart
 
-- name: "Networkd: Network: vtep"
+- name: "Networkd: Network: lo vtep ip"
   template:
-    src: "networkd.network.vtep.j2"
-    dest: "/etc/systemd/network/10-vtep.network"
+    src: "networkd.network.lo.j2"
+    dest: "/etc/systemd/network/10-lo.network"
   when: network_vtep_ip is defined
   notify: network_restart
 
