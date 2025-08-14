@@ -3,53 +3,84 @@
 - name: "APT: Install required packages"
   ansible.builtin.apt:
     pkg:
-      - netplan.io
       - networkd-dispatcher
-      - frr
       - ufw
+      - bridge-utils
     state: present
 
-########## FRR Fixes
-# FRR 8.4.4 in Ubuntu 24.04 has an issue resolved by https://github.com/FRRouting/frr/pull/12524
-- name: "Check installed FRR version"
-  shell: "dpkg -l frr | grep ii | awk '{ print $3 }'"
-  changed_when: false
-  register: frr_version
-  when: ansible_distribution == "Ubuntu"
+- name: "VXLAN: Sanity check base config: vtep/asn"
+  fail:
+    msg: "if network_vtep_ip or network_underlay_asn is defined, both must be"
+  when: (network_vtep_ip is defined or network_underlay_asn is defined) and (network_vtep_ip is not defined or network_underlay_asn is not defined)
 
-- name: "Download patched FRR"
-  ansible.builtin.get_url:
-    url: https://bradhouse.dev/wp-content/uploads/2025/06/frr_8.4.4-1.99deb12u1_amd64.deb
-    dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
-    mode: "600"
-  become: false
-  delegate_to: localhost
-  when: hostvars[item]['frr_version'].stdout|default("") == '8.4.4-1.1ubuntu6.3'
-  with_items: "{{ play_hosts }}"
-  run_once: true
+- name: "VXLAN: Sanity check base config: vtep/vxlaniface"
+  fail:
+    msg: "network_vtep_ip is not defined, but network_vxlans is defined"
+  when: network_vtep_ip is not defined and network_vxlans is defined
 
-- name: "Send patched FRR to remote"
-  copy:
-    src: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
-    dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
-    mode: "600"
-  when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
+- name: "VXLAN: Sanity check base config: vtep/underlay"
+  fail:
+    msg: "network_vtep_ip is not defined, but network_underlay_interfaces is defined"
+  when: network_vtep_ip is not defined and network_underlay_interfaces is defined
 
-- name: "Install patched FRR"
-  shell: "dpkg -i /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb"
-  when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
-  notify: frr_restart
+- name: "VXLAN: Sanity check peer configuration"
+  fail:
+    msg: "must provide network_underlay_interfaces or network_underlay_peergroups for vxlan evpn peering"
+  when: network_vtep_ip is defined and (network_underlay_interfaces|default([])|length == 0 and network_underlay_peergroups|default([])|length == 0)
 
-- name: "Cleanup download"
-  file:
-    path: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
-    state: absent
-  delegate_to: localhost
-  become: false
-  when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
+- name: "VXLAN: Sanity check peergroup configuration"
+  fail:
+    msg: "must provide network_underlay_srcip when using network_underlay_peergroups is used"
+  when: network_vtep_ip is defined and network_underlay_peergroups is defined and network_underlay_srcip is not defined
 
+- name: FRR
+  block:
+    - name: "APT: Install FRR"
+      ansible.builtin.apt:
+        pkg:
+          - frr
+        state: present
+      notify: network_vxlanevpn_reboot
 
-##########
+    # FRR 8.4.4 in Ubuntu 24.04 has an issue resolved by https://github.com/FRRouting/frr/pull/12524
+    - name: "Check installed FRR version"
+      shell: "dpkg -l frr | grep ii | awk '{ print $3 }'"
+      changed_when: false
+      register: frr_version
+      when: ansible_distribution == "Ubuntu"
+
+    - name: "Download patched FRR"
+      ansible.builtin.get_url:
+        url: https://bradhouse.dev/wp-content/uploads/2025/06/frr_8.4.4-1.99deb12u1_amd64.deb
+        dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
+        mode: "600"
+      become: false
+      delegate_to: localhost
+      when: hostvars[item]['frr_version'].stdout|default("") == '8.4.4-1.1ubuntu6.3'
+      with_items: "{{ play_hosts }}"
+      run_once: true
+
+    - name: "Send patched FRR to remote"
+      copy:
+        src: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
+        dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
+        mode: "600"
+      when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
+
+    - name: "Install patched FRR"
+      shell: "dpkg -i /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb"
+      when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
+      notify: network_restart
+
+    - name: "Cleanup download"
+      file:
+        path: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
+        state: absent
+      delegate_to: localhost
+      become: false
+      when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
+  when: network_vtep_ip is defined
+
 
 - name: "APT: Purge undesired packages"
   ansible.builtin.apt:
@@ -57,16 +88,9 @@
       - ifupdown
       - ifupdown2
       - ifupdown-ng
+      - netplan.io
     purge: true
     state: absent
-
-- name: "Gather interface mappings"
-  set_fact:
-    network_vxlanevpn_interfaces_json: "{{ lookup('template', 'resolve_vxlan_interfaces.j2') }}"
-
-- name: "Parse interface mappings"
-  set_fact:
-    network_vxlanevpn_interfaces: "{{ network_vxlanevpn_interfaces_json|from_yaml }}"
 
 - name: "FRR: enable bgp and bfd"
   lineinfile:
@@ -79,47 +103,352 @@
       val: "yes"
     - key: "bfdd"
       val: "yes"
-  notify: frr_restart
+  notify: network_vxlanevpn_reboot
+  when: network_vtep_ip is defined
 
-# Flush handlers as frr_restart can interrupt.
-- name: "Flush handlers"
-  ansible.builtin.meta: flush_handlers
+- name: "Cache bond names"
+  set_fact:
+    network_bond_names: "{{ network_bonds|default([]) | map(attribute='name') | list }}"
 
-- name: Find interfaces configuration
+- name: "Cache bridge names"
+  set_fact:
+    network_bridge_names: "{{ network_bridges|default([]) | map(attribute='name') | list }}"
+
+- name: "Cache bridge interface names"
+  set_fact:
+    network_bridge_iface_names: >-
+      {%- set items = [] %}
+      {%- for bridge in network_bridges|default([]) %}
+      {%-   for interface in bridge.interfaces|default([]) %}
+      {%-     if interface.ifname is defined %}
+      {%-       do items.append(interface.ifname) %}
+      {%-     endif %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+
+- name: "Cache vlan names"
+  set_fact:
+    network_vlan_names: "{{ network_vlans|default([]) | map(attribute='name') | list }}"
+
+- name: "Cache interface names"
+  set_fact:
+    network_interface_names: "{{ (network_interfaces|default([]) | selectattr('name', 'defined') | map(attribute='name') | list) + (network_interfaces|default([]) | rejectattr('name', 'defined') | map(attribute='ifname') | list) }}"
+
+- name: "Validate configuration"
+  set_fact:
+    validate_interfaces: "{{ lookup('template', 'validate_config.j2') }}"
+
+- name: "See if vxlan is using vlan aware bridging"
+  set_fact:
+    vxlan_vlan_bridge: "{{ true if network_vxlans | default([]) | map(attribute='vlan') | select('defined') | list | length > 0 else false }}"
+
+- name: "Retrieve original interface names if remapped"
+  script: iface_orig_names.sh
+  register: orig_names_str
+  changed_when: False
+
+- name: "Load original interface names dictionary"
+  set_fact:
+    network_orig_iface_names: "{{ orig_names_str.stdout|from_yaml }}"
+
+- name: "Set Expected Configuration Files"
+  set_fact:
+    expected_config_files: "{{ lookup('template', 'expected_config_files.j2') | from_yaml }}"
+
+- name: "Find stale config files"
   find:
-    paths: /etc/netplan
+    paths: /etc/systemd/network
     file_type: file
-    excludes:
-      - "config.yaml"
-  register: netplan_files
+    excludes: "{{ expected_config_files }}"
+  register: networkd_files
 
-# - name: Delete unused netplan configuration
-#   file:
-#     path: "{{ item.path }}"
-#     state: absent
-#   with_items: "{{ netplan_files['files'] }}"
+- name: "Delete unused networkd configuration files"
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  with_items: "{{ networkd_files['files'] }}"
 
-- name: "NetPlan: write configuration"
+- name: "See if we are on a fresh configuration"
+  find:
+    paths: /etc/systemd/network
+    file_type: file
+  register: networkd_files
+  changed_when: networkd_files["files"] | length == 0
+  notify: network_vxlanevpn_reboot
+
+- name: "Networkd: Link: ethernet interfaces"
   template:
-    src: netplan.conf.j2
-    dest: /etc/netplan/52-network_vxlanevpn_config.yaml
-    mode: "600"
-  register: netplan
+    src: "networkd.link.j2"
+    dest: "/etc/systemd/network/10-eth-{{ interface.name|default(interface.ifname) }}.link"
+  vars:
+    interface: "{{ item }}"
+    config: "{{ item }}"
+    defaultmtu: 1500
+  with_items: "{{ network_interfaces }}"
+  when: network_interfaces is defined
+  notify: network_restart
 
-- name: "NetPlan: make sure /etc/networkd-dispatcher/configuring.d/ exists"
+- name: "Networkd: Link: underlay interfaces"
+  template:
+    src: "networkd.link.j2"
+    dest: "/etc/systemd/network/10-underlay-iface{{ index }}.link"
+  vars:
+    interface: "{{ item.interface }}"
+    config: "{{ item.config }}"
+    index: "{{ item.iface_index }}"
+    defaultmtu: 9100
+  loop: >-
+      {%- set items = [] %}
+      {%- for interface in network_underlay_interfaces %}
+      {%-   if interface.ifname|default("") not in network_bond_names + network_bridge_names + network_vlan_names %}
+      {%-     do items.append({ 'interface': interface, 'config': interface, 'iface_index': loop.index0 }) %}
+      {%-   endif %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_underlay_interfaces is defined
+  notify: network_restart
+
+- name: "Networkd: Link: bridge interfaces"
+  template:
+    src: "networkd.link.j2"
+    dest: "/etc/systemd/network/10-bridge-{{ config.name }}-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}.link"
+  vars:
+    interface: "{{ item.interface }}"
+    config: "{{ item.config }}"
+    index: "{{ item.iface_index }}"
+    defaultmtu: "{{ item.config.mtu|default(9000) }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for bridge in network_bridges %}
+      {%-   for interface in bridge.interfaces|default([]) %}
+      {%-     if interface.ifname|default("") not in network_bond_names + network_vlan_names + network_interface_names %}
+      {%-       do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
+      {%-     endif %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_bridges is defined
+  notify: network_restart
+
+- name: "Networkd: Link: bond interfaces"
+  template:
+    src: "networkd.link.j2"
+    dest: "/etc/systemd/network/10-bond-{{ config.name }}-iface{{ index }}.link"
+  vars:
+    interface: "{{ item.interface }}"
+    config: "{{ item.config }}"
+    index: "{{ item.iface_index }}"
+    defaultmtu: "{{ item.config.mtu|default(9000) }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for bond in network_bonds %}
+      {%-   for interface in bond.interfaces %}
+      {%-     do items.append({ 'interface': interface, 'config': bond, 'iface_index': loop.index0 }) %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_bonds is defined
+  notify: network_restart
+
+- name: "Networkd: NetDev: bonds"
+  template:
+    src: "networkd.netdev.bond.j2"
+    dest: "/etc/systemd/network/20-bond-{{ config.name }}.netdev"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_bonds }}"
+  when: network_bonds is defined
+  notify: network_restart
+
+- name: "Networkd: NetDev: bridges"
+  template:
+    src: "networkd.netdev.bridge.j2"
+    dest: "/etc/systemd/network/30-bridge-{{ config.name }}.netdev"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_bridges }}"
+  when: network_bridges is defined
+  notify: network_restart
+
+- name: "Networkd: NetDev: vlan"
+  template:
+    src: "networkd.netdev.vlan.j2"
+    dest: "/etc/systemd/network/40-vlan{{config.vlan}}-{{ config.name }}-attachedto-{{ config.ifname }}.netdev"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_vlans }}"
+  when: network_vlans is defined
+  notify: network_restart
+
+- name: "Networkd: NetDev: vxlan0"
+  template:
+    src: "networkd.netdev.vxlan0.j2"
+    dest: "/etc/systemd/network/30-vxlan0.netdev"
+  when: vxlan_vlan_bridge
+  notify: network_restart
+
+- name: "Networkd: Network: vxlan0"
+  template:
+    src: "networkd.network.vxlan0.j2"
+    dest: "/etc/systemd/network/40-vxlan0.network"
+  when: vxlan_vlan_bridge
+  notify: network_restart
+
+- name: "Networkd: NetDev: vxlan"
+  template:
+    src: "networkd.netdev.vxlan.j2"
+    dest: "/etc/systemd/network/40-vxlan{{ config.vni }}.netdev"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_vxlans }}"
+  when: network_vxlans is defined
+  notify: network_restart
+
+- name: "Networkd: Network: lo vtep ip"
+  template:
+    src: "networkd.network.lo.j2"
+    dest: "/etc/systemd/network/10-lo.network"
+  when: network_vtep_ip is defined
+  notify: network_restart
+
+- name: "Networkd: Network: vxlan"
+  template:
+    src: "networkd.network.vxlan.j2"
+    dest: "/etc/systemd/network/50-vxlan{{ config.vni }}{{ '-vlan' ~ config.vlan if config.vlan is defined else '' }}-attachedto-{{ config.ifname }}.network"
+  vars:
+    config: "{{ item }}"
+  loop: "{{ network_vxlans }}"
+  when: network_vxlans is defined
+  notify: network_restart
+
+- name: "Networkd: Network: eth"
+  template:
+    src: "networkd.network.j2"
+    dest: "/etc/systemd/network/10-eth-{{ config.name|default(config.ifname) }}.network"
+  vars:
+    config: "{{ item }}"
+    type: "eth"
+  loop: "{{ network_interfaces }}"
+  when: network_interfaces is defined
+  notify: network_restart
+
+- name: "Networkd: Network: underlay"
+  template:
+    src: "networkd.network.underlay.j2"
+    dest: "/etc/systemd/network/10-underlay-iface{{ index }}.network"
+  vars:
+    config: "{{ item.interface }}"
+    interface: "{{ item.config }}"
+    index: "{{ item.iface_index }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for interface in network_underlay_interfaces %}
+      {%-   if interface.ifname|default("") not in network_bond_names + network_bridge_names + network_vlan_names %}
+      {%-     do items.append({ 'interface': interface, 'config': interface, 'iface_index': loop.index0 }) %}
+      {%-   endif %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_underlay_interfaces is defined
+  notify: network_restart
+
+- name: "Networkd: Network: bond iface"
+  template:
+    src: "networkd.network.bond_iface.j2"
+    dest: "/etc/systemd/network/40-bond-{{ config.name }}-iface{{ index }}.network"
+  vars:
+    config: "{{ item.config }}"
+    interface: "{{ item.interface }}"
+    index: "{{ item.iface_index }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for bond in network_bonds %}
+      {%-   for interface in bond.interfaces %}
+      {%-     do items.append({ 'interface': interface, 'config': bond, 'iface_index': loop.index0 }) %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_bonds is defined
+  notify: network_restart
+
+- name: "Networkd: Network: bridge iface"
+  template:
+    src: "networkd.network.bridge_iface.j2"
+    dest: "/etc/systemd/network/50-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}-attachedto-{{ config.name }}.network"
+  vars:
+    config: "{{ item.config }}"
+    interface: "{{ item.interface }}"
+    index: "{{ item.iface_index }}"
+  loop: >-
+      {%- set items = [] %}
+      {%- for bridge in network_bridges %}
+      {%-   for interface in bridge.interfaces|default([]) %}
+      {%-     do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
+      {%-   endfor %}
+      {%- endfor %}
+      {{- items -}}
+  when: network_bridges is defined
+  notify: network_restart
+
+- name: "Networkd: Network: vlans"
+  template:
+    src: "networkd.network.j2"
+    dest: "/etc/systemd/network/60-vlan{{config.vlan}}-{{ config.name }}-attachedto-{{ config.ifname }}.network"
+  vars:
+    config: "{{ item }}"
+    type: "vlan"
+  loop: "{{ network_vlans }}"
+  when: network_vlans is defined
+  notify: network_restart
+
+- name: "Networkd: Network: bonds"
+  template:
+    src: "networkd.network.j2"
+    dest: "/etc/systemd/network/60-bond-{{ config.name }}.network"
+  vars:
+    config: "{{ item }}"
+    type: "bond"
+  loop: "{{ network_bonds }}"
+  when: network_bonds is defined
+  notify: network_restart
+
+- name: "Networkd: Network: bridge"
+  template:
+    src: "networkd.network.j2"
+    dest: "/etc/systemd/network/60-bridge-{{ config.name }}.network"
+  vars:
+    config: "{{ item }}"
+    type: "bridge"
+  loop: "{{ network_bridges }}"
+  when: network_bridges is defined
+  notify: network_restart
+
+- name: "Check Unexpected Configuration Files"
+  find:
+    paths: /etc/systemd/network
+    file_type: file
+    excludes: "{{ expected_config_files }}"
+  register: networkd_files
+
+- name: "Verify Unexpected Configuration Files"
+  fail:
+    msg: "Found unexpected configuration files {{ networkd_files['files'] | map(attribute='path') | list }}"
+  when: networkd_files['files']|length != 0
+
+- name: "Make sure /etc/networkd-dispatcher/configuring.d/ exists"
   file:
     path: /etc/networkd-dispatcher/configuring.d/
     state: directory
     mode: "755"
 
-- name: "NetPlan: create pre-up hooks for setting port configuration"
+- name: "Create pre-up hooks for setting port configuration"
   template:
     src: pre-up-hooks.j2
     dest: /etc/networkd-dispatcher/configuring.d/50-pre-up.sh
     mode: "755"
   register: networkd
 
-- name: "NetPlan: ensure networkd-dispatcher is started"
+- name: "Ensure networkd-dispatcher is started"
   service:
     name: networkd-dispatcher
     state: started
@@ -131,13 +460,7 @@
     dest: /etc/sysctl.d/99-frr.conf
     mode: "660"
   notify: sysctl_restart
-
-# - name: "ifupdown-ng: write configuration"
-#   template:
-#     src: interfaces.j2
-#     dest: /etc/network/interfaces
-#     mode: "600"
-#   register: interfaces
+  when: network_vtep_ip is defined
 
 - name: "FRR: write configuration"
   template:
@@ -146,6 +469,7 @@
     dest: /etc/frr/frr.conf
     mode: "660"
   notify: frr_reload
+  when: network_vtep_ip is defined
 
 - name: "Instruct networkd not to mess with our routes"
   community.general.ini_file:
@@ -167,13 +491,31 @@
     - section: "Network"
       key: "ManageForeignRoutingPolicyRules"
       val: "no"
-  notify: networkctl_reload
+  notify: network_restart
 
 - name: "FRR: ensure enabled and started"
   service:
     name: frr
     state: started
     enabled: true
+  when: network_vtep_ip is defined
+
+- name: "Find stale system netplan files"
+  find:
+    paths: /etc/netplan
+    file_type: file
+  register: netplan_files
+
+- name: "Delete unused netplan configuration files"
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  with_items: "{{ netplan_files['files'] }}"
+
+- name: "ensure cloud init doesn't have network config"
+  file:
+    path: "/etc/cloud/cloud.cfg.d/50-curtin-networking.cfg"
+    state: absent
 
 - name: "UFW: allow BGP unnumbered"
   community.general.ufw:
@@ -182,6 +524,7 @@
     proto: tcp
     src: "fe80::/10"
     dest: "fe80::/10"
+  when: network_vtep_ip is defined
 
 - name: "UFW: allow BFD"
   community.general.ufw:
@@ -190,6 +533,7 @@
     proto: udp
     src: "fe80::/10"
     dest: "fe80::/10"
+  when: network_vtep_ip is defined
 
 - name: "UFW: allow VXLAN VTEP"
   community.general.ufw:
@@ -198,41 +542,13 @@
     proto: udp
     src: "{{ network_vtep_ip }}"
     dest: "{{ network_vtep_ip|split('/')|first }}/32"
+  when: network_vtep_ip is defined
 
 - name: "UFW: ensure ufw is enabled and started"
   service:
     name: ufw
     state: started
     enabled: true
-
-# - name: "Disable systemd-networkd"
-#   service:
-#     name: systemd-networkd-wait-online
-#     enabled: false
-
-# - name: "Mask systemd-networkd-wait-online"
-#   ansible.builtin.systemd_service:
-#     name: systemd-networkd-wait-online
-#     masked: true
-
-# - name: "Enable ifupdown2-ng networking"
-#   service:
-#     name: networking
-#     enabled: true
-
-- name: "VXLAN configuration changed, rebooting...(one node at a time)"
-  reboot:
-    msg: "rebooting now"
-    connect_timeout: 10
-    post_reboot_delay: 60
-  when: netplan.changed or networkd.changed
-  throttle: 1
-
-- name: Refresh facts
-  ansible.builtin.setup:
-    gather_subset:
-      - network
-  when: netplan.changed or networkd.changed
 
 # We want to flush any handlers to make sure BGP comes online at this point as
 # other roles may require connectivity provided.
