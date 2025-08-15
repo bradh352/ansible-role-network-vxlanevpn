@@ -517,13 +517,13 @@
     path: "/etc/cloud/cloud.cfg.d/50-curtin-networking.cfg"
     state: absent
 
-- name: "UFW: allow BGP unnumbered"
+- name: "UFW: allow BGP"
   community.general.ufw:
     rule: allow
     port: 179
     proto: tcp
-    src: "fe80::/10"
-    dest: "fe80::/10"
+    src: "{{ 'fe80::/10' if network_underlay_interfaces is defined else omit }}"
+    dest: "{{ 'fe80::/10' if network_underlay_interfaces is defined else network_underlay_srcip }}"
   when: network_vtep_ip is defined
 
 - name: "UFW: allow BFD"
@@ -531,8 +531,8 @@
     rule: allow
     port: 3784
     proto: udp
-    src: "fe80::/10"
-    dest: "fe80::/10"
+    src: "{{ 'fe80::/10' if network_underlay_interfaces is defined else omit }}"
+    dest: "{{ 'fe80::/10' if network_underlay_interfaces is defined else network_underlay_srcip }}"
   when: network_vtep_ip is defined
 
 - name: "UFW: allow VXLAN VTEP"
