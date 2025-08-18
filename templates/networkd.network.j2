@@ -46,7 +46,7 @@ Bridge={{ bridge.name }}
 {%   endfor %}
 {% endif %}
 {# ------- DISABLE ASSIGNMENT OF ADDRESSES TO BRIDGE INTERFACES AND VLAN-AWARE BRIDGES ------ #}
-{% if (type == "bridge" and config.vlan_aware|default(true)) or is_bridge_interface %}
+{% if (type == "bridge" and config.vlan_aware|default(true) and config.pvid is not defined) or is_bridge_interface %}
 DHCP=no
 LinkLocalAddressing=no
 LLDP=no
