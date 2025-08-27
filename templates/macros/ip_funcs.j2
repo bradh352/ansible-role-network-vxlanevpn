@@ -13,7 +13,7 @@
 {%     do iface_list.append(orig_ifname(orignamemap, interface.ifname)) %}
 {%   elif interface.macaddr is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
-{%       if ansible_facts[host_iface].macaddress|default("") == interface.macaddr %}
+{%       if ansible_facts[host_iface].perm_macaddress|default(ansible_facts[host_iface].macaddress|default("")) == interface.macaddr %}
 {%         do iface_list.append(orig_ifname(orignamemap, host_iface)) %}
 {%       endif %}
 {%     endfor %}
