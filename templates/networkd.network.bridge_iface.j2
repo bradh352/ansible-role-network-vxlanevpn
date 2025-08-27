@@ -8,13 +8,24 @@ Name={{ interface.ifname }}
 {% include "networkd.network.match.j2" %}
 {% endif %}
 
+[Link]
+MTUBytes={{ config.mtu | default(1500) }}
+Promiscuous=true
+
 [Network]
 Bridge={{ config.name }}
+DHCP=no
+LinkLocalAddressing=no
+LLDP=no
+EmitLLDP=no
+IPv6AcceptRA=no
+IPv6SendRA=no
+
 {% if interface.vlans is defined %}
 {%   if not config.vlan_aware|default(true) %}
 {{ notdefined | mandatory(msg='bridge is not vlan aware, cannot specify vlans') }}
 {%   endif %}
-{%   for vlan in vlans %}
+{%   for vlan in interface.vlans %}
 
 [BridgeVLAN]
 VLAN={{ vlan }}

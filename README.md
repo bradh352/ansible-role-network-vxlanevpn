@@ -194,6 +194,9 @@ systemd system with minimal effort.
       this tag set, and egress packets in this vlan shall be sent out untagged.
   * `stp`: Boolean. Whether or not to enable Spanning Tree Protocol. Default `true`.
   * `vlan_aware`: Boolean. Whether or not the bridge is VLAN aware. Default `true`.
+  * `vlans`: List of vlans for the bridge to support.  Should be inclusive of all
+    interface vlans. May be either a single vlan or a range, e.g. `10-20`.  If not
+    specified on a vlan-aware bridge, will use `1-4094`.
   * `pvid`: When `vlan_aware`, this is the default vlan id.  Required if
     assigning IP addresses to bridge directly.  Default is unset.
   * `mtu`: MTU. Defaults to `9000`.
