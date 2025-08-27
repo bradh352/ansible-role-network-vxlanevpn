@@ -3,5 +3,8 @@
 {#   - interface: specific interface #}
 {% include "networkd.network.match.j2" %}
 
+[Link]
+Promiscuous=true
+
 [Network]
 Bond={{ config.name }}

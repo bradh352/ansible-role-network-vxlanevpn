@@ -40,7 +40,8 @@ VXLAN=vxlan{{ vxlan.vni }}
 {%   for bridge in network_bridges|default([]) %}
 {%     for interface in bridge.interfaces|default([]) %}
 {%       if config.name | default(config.iface) == interface.ifname|default("") %}
-Bridge={{ bridge.name }}
+{# Think we use networkd.network.bridge_iface.j2 for this purpose these days leaving code here just in case we need it #}
+{# Bridge={{ bridge.name }} #}
 {%       endif %}
 {%     endfor %}
 {%   endfor %}
@@ -97,3 +98,18 @@ UseDomains=no
 UseGateway=no
 UseRoutePrefix=no
 {% endif %}
+
+{% if type == "bridge" and config.vlan_aware|default(true) %}
+{%   for vlan in config.vlans|default(["1-4094"]) %}
+
+[BridgeVLAN]
+VLAN={{ vlan }}
+{%   endfor %}
+{%   if config.pvid is defined %}
+
+[BridgeVLAN]
+PVID={{ interface.pvid }}
+EgressUntagged={{ interface.pvid }}
+{%   endif %}
+{% endif %}
+

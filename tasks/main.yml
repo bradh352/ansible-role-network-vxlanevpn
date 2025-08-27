@@ -240,6 +240,7 @@
     config: "{{ item.config }}"
     index: "{{ item.iface_index }}"
     defaultmtu: "{{ item.config.mtu|default(9000) }}"
+    is_bond: true
   loop: >-
       {%- set items = [] %}
       {%- for bond in network_bonds %}
@@ -330,7 +331,7 @@
     config: "{{ item }}"
     type: "eth"
   loop: "{{ network_interfaces }}"
-  when: network_interfaces is defined
+  when: network_interfaces is defined and (item.name not in network_bridge_iface_names or item.addresses|default([])|count > 0 or item.dhcp|default(false))
   notify: network_restart
 
 - name: "Networkd: Network: underlay"
@@ -409,7 +410,7 @@
     config: "{{ item }}"
     type: "bond"
   loop: "{{ network_bonds }}"
-  when: network_bonds is defined
+  when: network_bonds is defined and (item.name not in network_bridge_iface_names or item.addresses|default([])|count > 0 or item.dhcp|default(false))
   notify: network_restart
 
 - name: "Networkd: Network: bridge"

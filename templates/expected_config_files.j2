@@ -4,7 +4,9 @@
 {% endif %}
 {% for iface in network_interfaces|default([]) %}
 {%   do files.append("10-eth-" ~ iface.name|default(iface.ifname) ~ ".link") %}
-{%   do files.append("10-eth-" ~ iface.name|default(iface.ifname) ~ ".network") %}
+{%   if iface.name|default(iface.ifname) not in network_bridge_iface_names or iface.addresses|default([])|count > 0 or iface.dhcp|default(false) %}
+{%     do files.append("10-eth-" ~ iface.name|default(iface.ifname) ~ ".network") %}
+{%   endif %}
 {% endfor %}
 {% for iface in network_underlay_interfaces|default([]) %}
 {%   if iface.ifname|default("") not in network_bridge_names + network_bond_names + network_vlan_names %}
@@ -17,7 +19,9 @@
 {%   for interface in bond.interfaces %}
 {%     do files.append("40-bond-" ~ bond.name ~ "-iface" ~ loop.index0 ~ ".network") %}
 {%   endfor %}
-{%   do files.append("60-bond-" ~ bond.name ~ ".network") %}
+{%   if bond.name not in network_bridge_iface_names or bond.addresses|default([])|count > 0 or bond.dhcp|default(false) %}
+{%     do files.append("60-bond-" ~ bond.name ~ ".network") %}
+{%   endif %}
 {% endfor %}
 {% for bridge in network_bridges|default([]) %}
 {%   do files.append("30-bridge-" ~ bridge.name ~ ".netdev") %}
