@@ -10,7 +10,9 @@
 Name={{ interface.name }}
 {% endif %}
 WakeOnLan=off
+{% if not is_bond|default(false) %}
 MTUBytes={{ config.mtu|default(defaultmtu) }}
+{% endif %}
 {% if interface.speed is defined %}
 BitsPerSecond={{ interface.speed }}
 {% endif %}

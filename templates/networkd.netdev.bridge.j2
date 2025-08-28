@@ -8,7 +8,7 @@ Kind=bridge
 [Bridge]
 {% if config.vlan_aware|default(true) %}
 VLANFiltering=yes
-DefaultPVID={{ config.pvid if config.pvid is defined else 'none' }}
+DefaultPVID={{ config.pvid if config.pvid is defined else '1' }}
 VLANProtocol=802.1q
 {% else %}
 VLANFiltering=no
