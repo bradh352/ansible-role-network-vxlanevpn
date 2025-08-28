@@ -86,10 +86,12 @@ router bgp {{ network_underlay_asn }}
 {%   set peers = [] %}
 {%   for groupname in network_underlay_peergroups %}
 {%     for host in groups[groupname] %}
-{%       if hostvars[host]['network_underlay_srcip'] is not defined %}
+{%       if host != inventory_hostname %}
+{%         if hostvars[host]['network_underlay_srcip'] is not defined %}
 {{ notdefined | mandatory(msg='network_underlay_srcip not defined for host ' ~ host) }}
+{%         endif %}
+{%         do peers.append(hostvars[host]['network_underlay_srcip']) %}
 {%       endif %}
-{%       do peers.append(hostvars[host]['network_underlay_srcip']) %}
 {%     endfor %}
 {%   endfor %}
 {%   for peer in peers|unique|sort %}
