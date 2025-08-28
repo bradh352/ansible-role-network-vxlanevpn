@@ -1,7 +1,7 @@
 {# Requires variables: #}
 {#   - config: general configuration for bridge #}
 {#   - interface: specific interface #}
-{% if interface.ifname | default("") in network_bond_names %}
+{% if interface.ifname | default("") in network_bond_names or interface.ifname|default("") in network_vlan_names %}
 [Match]
 Name={{ interface.ifname }}
 {% else %}
@@ -10,7 +10,9 @@ Name={{ interface.ifname }}
 
 [Link]
 MTUBytes={{ config.mtu | default(1500) }}
+{% if not interface.ifname|default("") in network_vlan_names %}
 Promiscuous=true
+{% endif %}
 
 [Network]
 Bridge={{ config.name }}

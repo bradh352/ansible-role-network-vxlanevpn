@@ -399,7 +399,7 @@
     config: "{{ item }}"
     type: "vlan"
   loop: "{{ network_vlans }}"
-  when: network_vlans is defined
+  when: network_vlans is defined and item.name not in network_bridge_iface_names
   notify: network_restart
 
 - name: "Networkd: Network: bonds"
