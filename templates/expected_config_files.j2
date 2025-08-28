@@ -17,6 +17,7 @@
 {% for bond in network_bonds|default([]) %}
 {%   do files.append("20-bond-" ~ bond.name ~ ".netdev") %}
 {%   for interface in bond.interfaces %}
+{%     do files.append("10-bond-" ~ bond.name ~ "-iface" ~ loop.index0 ~ ".link") %}
 {%     do files.append("40-bond-" ~ bond.name ~ "-iface" ~ loop.index0 ~ ".network") %}
 {%   endfor %}
 {%   if bond.name not in network_bridge_iface_names or bond.addresses|default([])|count > 0 or bond.dhcp|default(false) %}
