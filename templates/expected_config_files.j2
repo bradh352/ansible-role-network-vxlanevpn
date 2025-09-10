@@ -36,7 +36,9 @@
 {% endfor %}
 {% for vlan in network_vlans|default([]) %}
 {%   do files.append("40-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ "-attachedto-" ~ vlan.ifname ~ ".netdev") %}
-{%   do files.append("60-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ "-attachedto-" ~ vlan.ifname ~ ".network") %}
+{%   if vlan.name not in network_bridge_iface_names %}
+{%     do files.append("60-vlan" ~ vlan.vlan ~ "-" ~ vlan.name ~ "-attachedto-" ~ vlan.ifname ~ ".network") %}
+{%   endif %}
 {% endfor %}
 {% for vxlan in network_vxlans|default([]) %}
 {%   do files.append("40-vxlan" ~ vxlan.vni ~ ".netdev") %}
