@@ -7,6 +7,14 @@
       - ufw
       - bridge-utils
     state: present
+  when: ansible_os_family == 'Debian'
+
+- name: "DNF: Install required packages"
+  ansible.builtin.dnf:
+    name:
+      - firewalld
+    state: present
+  when: ansible_os_family == 'RedHat'
 
 - name: "VXLAN: Sanity check base config: vtep/asn"
   fail:
@@ -41,6 +49,15 @@
           - frr
         state: present
       notify: network_vxlanevpn_reboot
+      when: ansible_os_family == 'Debian'
+
+    - name: "DNF: Install FRR"
+      ansible.builtin.dnf:
+        name:
+          - frr
+        state: present
+      notify: network_vxlanevpn_reboot
+      when: ansible_os_family == 'RedHat'
 
     # FRR 8.4.4 in Ubuntu 24.04 has an issue resolved by https://github.com/FRRouting/frr/pull/12524
     - name: "Check installed FRR version"
@@ -91,6 +108,7 @@
       - netplan.io
     purge: true
     state: absent
+  when: ansible_os_family == 'Debian'
 
 - name: "FRR: enable bgp and bfd"
   lineinfile:
@@ -158,302 +176,44 @@
 
 - name: "Find stale config files"
   find:
-    paths: /etc/systemd/network
+    paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
     excludes: "{{ expected_config_files }}"
-  register: networkd_files
+  register: network_config_files
 
-- name: "Delete unused networkd configuration files"
+- name: "Delete unused network configuration files"
   file:
     path: "{{ item.path }}"
     state: absent
-  with_items: "{{ networkd_files['files'] }}"
+  with_items: "{{ network_config_files['files'] }}"
 
 - name: "See if we are on a fresh configuration"
   find:
-    paths: /etc/systemd/network
+    paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
-  register: networkd_files
-  changed_when: networkd_files["files"] | length == 0
+  register: network_config_files
+  changed_when: network_config_files["files"] | length == 0
   notify: network_vxlanevpn_reboot
 
-- name: "Networkd: Link: ethernet interfaces"
-  template:
-    src: "networkd.link.j2"
-    dest: "/etc/systemd/network/10-eth-{{ interface.name|default(interface.ifname) }}.link"
-  vars:
-    interface: "{{ item }}"
-    config: "{{ item }}"
-    defaultmtu: 1500
-  with_items: "{{ network_interfaces }}"
-  when: network_interfaces is defined
-  notify: network_restart
+- name: "Configure Networkd on Debian-like systems"
+  include_tasks: "networkd.yml"
+  when: ansible_os_family == 'Debian'
 
-- name: "Networkd: Link: underlay interfaces"
-  template:
-    src: "networkd.link.j2"
-    dest: "/etc/systemd/network/10-underlay-iface{{ index }}.link"
-  vars:
-    interface: "{{ item.interface }}"
-    config: "{{ item.config }}"
-    index: "{{ item.iface_index }}"
-    defaultmtu: 9100
-  loop: >-
-      {%- set items = [] %}
-      {%- for interface in network_underlay_interfaces %}
-      {%-   if interface.ifname|default("") not in network_bond_names + network_bridge_names + network_vlan_names %}
-      {%-     do items.append({ 'interface': interface, 'config': interface, 'iface_index': loop.index0 }) %}
-      {%-   endif %}
-      {%- endfor %}
-      {{- items -}}
-  when: network_underlay_interfaces is defined
-  notify: network_restart
-
-- name: "Networkd: Link: bridge interfaces"
-  template:
-    src: "networkd.link.j2"
-    dest: "/etc/systemd/network/10-bridge-{{ config.name }}-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}.link"
-  vars:
-    interface: "{{ item.interface }}"
-    config: "{{ item.config }}"
-    index: "{{ item.iface_index }}"
-    defaultmtu: "{{ item.config.mtu|default(9000) }}"
-  loop: >-
-      {%- set items = [] %}
-      {%- for bridge in network_bridges %}
-      {%-   for interface in bridge.interfaces|default([]) %}
-      {%-     if interface.ifname|default("") not in network_bond_names + network_vlan_names + network_interface_names %}
-      {%-       do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
-      {%-     endif %}
-      {%-   endfor %}
-      {%- endfor %}
-      {{- items -}}
-  when: network_bridges is defined
-  notify: network_restart
-
-- name: "Networkd: Link: bond interfaces"
-  template:
-    src: "networkd.link.j2"
-    dest: "/etc/systemd/network/10-bond-{{ config.name }}-iface{{ index }}.link"
-  vars:
-    interface: "{{ item.interface }}"
-    config: "{{ item.config }}"
-    index: "{{ item.iface_index }}"
-    defaultmtu: "{{ item.config.mtu|default(9000) }}"
-    is_bond: true
-  loop: >-
-      {%- set items = [] %}
-      {%- for bond in network_bonds %}
-      {%-   for interface in bond.interfaces %}
-      {%-     do items.append({ 'interface': interface, 'config': bond, 'iface_index': loop.index0 }) %}
-      {%-   endfor %}
-      {%- endfor %}
-      {{- items -}}
-  when: network_bonds is defined
-  notify: network_restart
-
-- name: "Networkd: NetDev: bonds"
-  template:
-    src: "networkd.netdev.bond.j2"
-    dest: "/etc/systemd/network/20-bond-{{ config.name }}.netdev"
-  vars:
-    config: "{{ item }}"
-  loop: "{{ network_bonds }}"
-  when: network_bonds is defined
-  notify: network_restart
-
-- name: "Networkd: NetDev: bridges"
-  template:
-    src: "networkd.netdev.bridge.j2"
-    dest: "/etc/systemd/network/30-bridge-{{ config.name }}.netdev"
-  vars:
-    config: "{{ item }}"
-  loop: "{{ network_bridges }}"
-  when: network_bridges is defined
-  notify: network_restart
-
-- name: "Networkd: NetDev: vlan"
-  template:
-    src: "networkd.netdev.vlan.j2"
-    dest: "/etc/systemd/network/40-vlan{{config.vlan}}-{{ config.name }}-attachedto-{{ config.ifname }}.netdev"
-  vars:
-    config: "{{ item }}"
-  loop: "{{ network_vlans }}"
-  when: network_vlans is defined
-  notify: network_restart
-
-- name: "Networkd: NetDev: vxlan0"
-  template:
-    src: "networkd.netdev.vxlan0.j2"
-    dest: "/etc/systemd/network/30-vxlan0.netdev"
-  when: vxlan_vlan_bridge
-  notify: network_restart
-
-- name: "Networkd: Network: vxlan0"
-  template:
-    src: "networkd.network.vxlan0.j2"
-    dest: "/etc/systemd/network/40-vxlan0.network"
-  when: vxlan_vlan_bridge
-  notify: network_restart
-
-- name: "Networkd: NetDev: vxlan"
-  template:
-    src: "networkd.netdev.vxlan.j2"
-    dest: "/etc/systemd/network/40-vxlan{{ config.vni }}.netdev"
-  vars:
-    config: "{{ item }}"
-  loop: "{{ network_vxlans }}"
-  when: network_vxlans is defined
-  notify: network_restart
-
-- name: "Networkd: Network: lo vtep ip"
-  template:
-    src: "networkd.network.lo.j2"
-    dest: "/etc/systemd/network/10-lo.network"
-  when: network_vtep_ip is defined
-  notify: network_restart
-
-- name: "Networkd: Network: vxlan"
-  template:
-    src: "networkd.network.vxlan.j2"
-    dest: "/etc/systemd/network/50-vxlan{{ config.vni }}{{ '-vlan' ~ config.vlan if config.vlan is defined else '' }}-attachedto-{{ config.ifname }}.network"
-  vars:
-    config: "{{ item }}"
-  loop: "{{ network_vxlans }}"
-  when: network_vxlans is defined
-  notify: network_restart
-
-- name: "Networkd: Network: eth"
-  template:
-    src: "networkd.network.j2"
-    dest: "/etc/systemd/network/10-eth-{{ config.name|default(config.ifname) }}.network"
-  vars:
-    config: "{{ item }}"
-    type: "eth"
-  loop: "{{ network_interfaces }}"
-  when: network_interfaces is defined and (item.name not in network_bridge_iface_names or item.addresses|default([])|count > 0 or item.dhcp|default(false))
-  notify: network_restart
-
-- name: "Networkd: Network: underlay"
-  template:
-    src: "networkd.network.underlay.j2"
-    dest: "/etc/systemd/network/10-underlay-iface{{ index }}.network"
-  vars:
-    config: "{{ item.interface }}"
-    interface: "{{ item.config }}"
-    index: "{{ item.iface_index }}"
-  loop: >-
-      {%- set items = [] %}
-      {%- for interface in network_underlay_interfaces %}
-      {%-   if interface.ifname|default("") not in network_bond_names + network_bridge_names + network_vlan_names %}
-      {%-     do items.append({ 'interface': interface, 'config': interface, 'iface_index': loop.index0 }) %}
-      {%-   endif %}
-      {%- endfor %}
-      {{- items -}}
-  when: network_underlay_interfaces is defined
-  notify: network_restart
-
-- name: "Networkd: Network: bond iface"
-  template:
-    src: "networkd.network.bond_iface.j2"
-    dest: "/etc/systemd/network/40-bond-{{ config.name }}-iface{{ index }}.network"
-  vars:
-    config: "{{ item.config }}"
-    interface: "{{ item.interface }}"
-    index: "{{ item.iface_index }}"
-  loop: >-
-      {%- set items = [] %}
-      {%- for bond in network_bonds %}
-      {%-   for interface in bond.interfaces %}
-      {%-     do items.append({ 'interface': interface, 'config': bond, 'iface_index': loop.index0 }) %}
-      {%-   endfor %}
-      {%- endfor %}
-      {{- items -}}
-  when: network_bonds is defined
-  notify: network_restart
-
-- name: "Networkd: Network: bridge iface"
-  template:
-    src: "networkd.network.bridge_iface.j2"
-    dest: "/etc/systemd/network/50-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}-attachedto-{{ config.name }}.network"
-  vars:
-    config: "{{ item.config }}"
-    interface: "{{ item.interface }}"
-    index: "{{ item.iface_index }}"
-  loop: >-
-      {%- set items = [] %}
-      {%- for bridge in network_bridges %}
-      {%-   for interface in bridge.interfaces|default([]) %}
-      {%-     do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
-      {%-   endfor %}
-      {%- endfor %}
-      {{- items -}}
-  when: network_bridges is defined
-  notify: network_restart
-
-- name: "Networkd: Network: vlans"
-  template:
-    src: "networkd.network.j2"
-    dest: "/etc/systemd/network/60-vlan{{config.vlan}}-{{ config.name }}-attachedto-{{ config.ifname }}.network"
-  vars:
-    config: "{{ item }}"
-    type: "vlan"
-  loop: "{{ network_vlans }}"
-  when: network_vlans is defined and item.name not in network_bridge_iface_names
-  notify: network_restart
-
-- name: "Networkd: Network: bonds"
-  template:
-    src: "networkd.network.j2"
-    dest: "/etc/systemd/network/60-bond-{{ config.name }}.network"
-  vars:
-    config: "{{ item }}"
-    type: "bond"
-  loop: "{{ network_bonds }}"
-  when: network_bonds is defined and (item.name not in network_bridge_iface_names or item.addresses|default([])|count > 0 or item.dhcp|default(false))
-  notify: network_restart
-
-- name: "Networkd: Network: bridge"
-  template:
-    src: "networkd.network.j2"
-    dest: "/etc/systemd/network/60-bridge-{{ config.name }}.network"
-  vars:
-    config: "{{ item }}"
-    type: "bridge"
-  loop: "{{ network_bridges }}"
-  when: network_bridges is defined
-  notify: network_restart
+- name: "Configure NetworkManager on RedHat-like systems"
+  include_tasks: "networkmanager.yml"
+  when: ansible_os_family == 'RedHat'
 
 - name: "Check Unexpected Configuration Files"
   find:
-    paths: /etc/systemd/network
+    paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
     excludes: "{{ expected_config_files }}"
-  register: networkd_files
+  register: network_config_files
 
 - name: "Verify Unexpected Configuration Files"
   fail:
-    msg: "Found unexpected configuration files {{ networkd_files['files'] | map(attribute='path') | list }}"
-  when: networkd_files['files']|length != 0
-
-- name: "Make sure /etc/networkd-dispatcher/configuring.d/ exists"
-  file:
-    path: /etc/networkd-dispatcher/configuring.d/
-    state: directory
-    mode: "755"
-
-- name: "Create pre-up hooks for setting port configuration"
-  template:
-    src: pre-up-hooks.j2
-    dest: /etc/networkd-dispatcher/configuring.d/50-pre-up.sh
-    mode: "755"
-  register: networkd
-
-- name: "Ensure networkd-dispatcher is started"
-  service:
-    name: networkd-dispatcher
-    state: started
-    enabled: true
+    msg: "Found unexpected configuration files {{ network_config_files['files'] | map(attribute='path') | list }}"
+  when: network_config_files['files']|length != 0
 
 - name: "Sysctl: Neeeded parameters for FRR"
   copy:
@@ -471,28 +231,6 @@
     mode: "660"
   notify: frr_reload
   when: network_vtep_ip is defined
-
-- name: "Instruct networkd not to mess with our routes"
-  community.general.ini_file:
-    path: /etc/systemd/networkd.conf
-    no_extra_spaces: true
-    section: "{{ item.section }}"
-    option: "{{ item.key }}"
-    value: "{{ item.val }}"
-  with_items:
-    - section: "Network"
-      key: "KeepConfiguration"
-      val: "yes"
-    - section: "Network"
-      key: "ManageForeignNextHops"
-      val: "no"
-    - section: "Network"
-      key: "ManageForeignRoutes"
-      val: "no"
-    - section: "Network"
-      key: "ManageForeignRoutingPolicyRules"
-      val: "no"
-  notify: network_restart
 
 - name: "FRR: ensure enabled and started"
   service:
@@ -525,7 +263,7 @@
     proto: tcp
     src: "{{ 'fe80::/10' if network_underlay_interfaces is defined else omit }}"
     dest: "{{ 'fe80::/10' if network_underlay_interfaces is defined else network_underlay_srcip }}"
-  when: network_vtep_ip is defined
+  when: network_vtep_ip is defined and ansible_os_family == 'Debian'
 
 - name: "UFW: allow BFD"
   community.general.ufw:
@@ -534,7 +272,7 @@
     proto: udp
     src: "{{ 'fe80::/10' if network_underlay_interfaces is defined else omit }}"
     dest: "{{ 'fe80::/10' if network_underlay_interfaces is defined else network_underlay_srcip }}"
-  when: network_vtep_ip is defined
+  when: network_vtep_ip is defined and ansible_os_family == 'Debian'
 
 - name: "UFW: allow VXLAN VTEP"
   community.general.ufw:
@@ -543,13 +281,14 @@
     proto: udp
     src: "{{ network_vtep_ip }}"
     dest: "{{ network_vtep_ip|split('/')|first }}/32"
-  when: network_vtep_ip is defined
+  when: network_vtep_ip is defined and ansible_os_family == 'Debian'
 
 - name: "UFW: ensure ufw is enabled and started"
   service:
     name: ufw
     state: started
     enabled: true
+  when: ansible_os_family == 'Debian'
 
 # We want to flush any handlers to make sure BGP comes online at this point as
 # other roles may require connectivity provided.

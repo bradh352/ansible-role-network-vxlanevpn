@@ -1,0 +1,91 @@
+{# TODO: #}
+{#   - Support fec #}
+{% import 'macros/ip_funcs.j2' as ipfn %}
+{% set v4_routes=[] %}
+{% set v6_routes=[] %}
+{% set ns = namespace(v4_gateway='',v6_gateway='') %}
+{% for route in iface.routes | default([]) %}
+{%   if route.to | ansible.utils.ipv4 | length > 0 %}
+{%     if route.to == "0.0.0.0/0" %}
+{%       set ns.v4_gateway=route.via %}
+{%     else %}
+{%       do v4_routes.append(route) %}
+{%     endif %}
+{%   elif route.to | ansible.utils.ipv4 | length > 0 %}
+{%     if route.to == "::/0" %}
+{%       set ns.v6_gateway=route.via %}
+{%     else %}
+{%       do v6_routes.append(route) %}
+{%     endif %}
+{%   endif %}
+{% endfor %}
+[connection]
+id={{ iface.name|default(iface.ifname) }}
+uuid={{ iface.name|default(iface.ifname)|ansible.builtin.to_uuid }}
+type=ethernet
+{% set ifnames = ipfn.resolve_ifnames(iface.name|default(iface.ifname), ansible_facts, network_orig_iface_names, iface) | from_yaml %}
+interface-name={{ ifnames[0] }}
+
+[ipv4]
+{% if iface.dhcp|default(false) %}
+method=auto
+{%   if not iface.dhcp_allow_learning|default(true) %}
+ignore-auto-routes=true
+ignore-auto-dns=true
+{%   endif %}
+{% else %}
+{%   if iface.addresses|default([])|ansible.utils.ipv4|length == 0 %}
+method=disabled
+{%   else %}
+method=manual
+{%   endif %}
+{%   for ip in iface.addresses|default([])|ansible.utils.ipv4 %}
+address{{ loop.index }}={{ ip }}
+{%   endfor %}
+{%   if ns.v4_gateway | length > 0 %}
+gateway={{ ns.v4_gateway }}
+{%   endif %}
+{% endif %}
+{% if iface.nameservers.addresses|default([])|ansible.utils.ipv4|length > 0 %}
+dns={{ iface.nameservers.addresses|default([])|ansible.utils.ipv4|join(";") }};
+{% endif %}
+{% for route in v4_routes %}
+route{{ loop.index }}={{route["to"]}},{{route["via"]}}
+{% endfor %}
+
+[ipv6]
+addr-gen-mode=default
+{% if iface.dhcp|default(false) %}
+method=auto
+{%   if not iface.dhcp_allow_learning|default(true) %}
+ignore-auto-routes=true
+ignore-auto-dns=true
+{%   endif %}
+{% else %}
+{%   if iface.addresses|default([])|ansible.utils.ipv6|length == 0 %}
+method=disabled
+{%   else %}
+method=manual
+{%   endif %}
+{%   for ip in iface.addresses|default([])|ansible.utils.ipv6 %}
+address{{ loop.index }}={{ ip }}
+{%   endfor %}
+{%   if ns.v6_gateway | length > 0 %}
+gateway={{ ns.v6_gateway }}
+{%   endif %}
+{% endif %}
+{% for route in v6_routes %}
+route{{ loop.index }}={{route["to"]}},{{route["via"]}}
+{% endfor %}
+{% if iface.nameservers.addresses|default([])|ansible.utils.ipv6|length > 0 %}
+dns={{ iface.nameservers.addresses|default([])|ansible.utils.ipv6|join(";") }};
+{% endif %}
+
+[ethernet]
+mtu={{ iface.mtu | default(1500) }}
+{% if iface.speed is defined %}
+speed={{ iface.speed }}
+{% endif %}
+auto-negotiate={{ 'true' if iface.autonegotiation | default("true") else 'false' }}
+
+[proxy]

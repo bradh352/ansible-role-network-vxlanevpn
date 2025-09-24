@@ -1,6 +1,6 @@
 ---
 
-- name: "Restart Networking"
+- name: "Restart Networking networkd"
   shell: |
     systemctl restart systemd-udev-trigger
     networkctl reload
@@ -8,6 +8,18 @@
   async: 60
   poll: 0
   throttle: 1
+  when: ansible_os_family == 'Debian'
+
+- name: "Restart Networking NetworkManager"
+  shell: |
+    nmcli con reload
+    systemctl restart NetworkManager
+    systemctl is-active frr && systemctl restart frr || true
+  async: 60
+  poll: 0
+  throttle: 1
+  when: ansible_os_family == 'RedHat'
+
 
 - name: "Wait for the system to come back online"
   ansible.builtin.wait_for_connection:

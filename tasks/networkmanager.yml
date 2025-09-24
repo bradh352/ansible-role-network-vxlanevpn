@@ -1,0 +1,12 @@
+---
+- name: Write interface configuration
+  template:
+    src: iface.nmconnection.j2
+    dest: "/etc/NetworkManager/system-connections/{{ iface.name|default(iface.ifname) }}.nmconnection"
+    owner: root
+    mode: "600"
+  vars:
+    iface: "{{ item }}"
+  with_items: "{{ network_interfaces | default([]) }}"
+  notify: network_restart
+
