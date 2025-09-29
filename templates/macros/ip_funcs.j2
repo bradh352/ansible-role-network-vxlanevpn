@@ -1,20 +1,38 @@
 {% macro orig_ifname(namemap, name) %}
-{{- namemap['name']|default(name) -}}
+{{- namemap[name]|default(name) -}}
 {% endmacro -%}
 
+{% macro update_interface(interface, ansible_facts, orignamemap, iface_name) %}
+{%   set data = interface.copy() %}
+{%   do data.update({ 'ifname': orig_ifname(orignamemap, iface_name) }) %}
+{%   if data['name'] is not defined %}
+{%     do data.update({ 'name': orig_ifname(orignamemap, iface_name) }) %}
+{%   endif %}
+{%   set macaddr = ansible_facts[iface_name].perm_macaddress|default(ansible_facts[iface_name].macaddress|default("")) %}
+{%   if macaddr | length > 0 %}
+{%     do data.update({ 'macaddr': macaddr }) %}
+{%     do data.update({ 'is_phy': true}) %}
+{%   else %}
+{%     do data.update({ 'is_phy': false}) %}
+{%   endif %}
+{{- data -}}
+{% endmacro %}
+
 {% macro resolve_ifnames(debug_prefix, ansible_facts, orignamemap, interface, extra_ifnames=[], validate_ifname=true) -%}
-{# This macro takes in a dictionary with one of ifname, macaddr, driver, or pattern specified #}
+{# This macro takes in a dictionary with one of ifname, macaddr, driver, or pattern specified.  It then outputs a list
+{# of dictionaries with the matching interfaces.  For instance a pattern or driver may match multiple interfaces.  The
+{# output dictionaries will have the name, ifname, macaddr and is_phy updated if appropriate #}
 {# and outputs an array of matching interface names #}
 {%   set iface_list = [] %}
 {%   if interface.ifname is defined %}
 {%     if not interface.ifname in ansible_facts.interfaces and not interface.ifname in extra_ifnames and validate_ifname %}
 {{ notdefined | mandatory(msg=debug_prefix ~ ': interface, bond, or bridge with ifname ' + interface.ifname + ' not found') }}
 {%     endif %}
-{%     do iface_list.append(orig_ifname(orignamemap, interface.ifname)) %}
+{%     do iface_list.append(update_interface(interface, ansible_facts, orignamemap, interface.ifname)) %}
 {%   elif interface.macaddr is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if ansible_facts[host_iface].perm_macaddress|default(ansible_facts[host_iface].macaddress|default("")) == interface.macaddr %}
-{%         do iface_list.append(orig_ifname(orignamemap, host_iface)) %}
+{%         do iface_list.append(update_interface(interface, ansible_facts, orignamemap, host_iface)) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -23,7 +41,7 @@
 {%   elif interface.driver is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if ansible_facts[host_iface].module|default("") == interface.driver %}
-{%         do iface_list.append(orig_ifname(orignamemap, host_iface)) %}
+{%         do iface_list.append(update_interface(interface, ansible_facts, orignamemap, host_iface)) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -32,7 +50,7 @@
 {%   elif interface.pattern is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
 {%       if host_iface|regex_search(interface.pattern)|length > 0 %}
-{%         do iface_list.append(orig_ifname(orignamemap, host_iface)) %}
+{%         do iface_list.append(update_interface(interface, ansible_facts, orignamemap, host_iface)) %}
 {%       endif %}
 {%     endfor %}
 {%     if iface_list | length == 0 %}
@@ -41,5 +59,22 @@
 {%   else %}
 {{ notdefined | mandatory(msg=debug_prefix ~ ': interface must include one of ifname, macaddr, driver, or pattern') }}
 {%   endif %}
-{{- iface_list | sort -}}
+{{- iface_list | sort(attribute='name') -}}
+{% endmacro -%}
+
+{% macro resolve_ifnames_list(debug_prefix, ansible_facts, orignamemap, interfaces, extra_ifnames=[], validate_ifnames=true, max_interfaces=0) -%}
+{%  set output_list = [] %}
+{%  for interface in interfaces %}
+{%    set ifnames = resolve_ifnames(debug_prefix ~ '[' ~ loop.index0 ~ ']', ansible_facts, orignamemap, interface, extra_ifnames, validate_ifnames) %}
+{%    if ifnames|length < 1 %}
+{{ notdefined | mandatory(msg=debug_prefix ~ '[' ~ loop.index0 ~ '] did not resolve to an interface') }}
+{%    endif %}
+{%    if max_interfaces > 0 and ifnames|length > max_interfaces %}
+{{ notdefined | mandatory(msg=debug_prefix ~ '[' ~ loop.index0 ~ '] resolved to greater than ' ~ max_interfaces ~ 'interfaces') }}
+{%    endif %}
+{%    for ifname in ifnames %}
+{%      do output_list.append(ifname) %}
+{%    endfor %}
+{%  endfor %}
+{{- output_list | sort(attribute='name') -}}
 {% endmacro -%}

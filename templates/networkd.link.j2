@@ -2,13 +2,16 @@
 {#   - interface: dictionary of interface configuration attributes #}
 {#   - config: general configuration for bond, bridge or interface #}
 {#   - defaultmtu: default MTU size to use if not specified #}
-{% include "networkd.link.match.j2" %}
+[Match]
+Type=ether
+{# We always resolve the macaddr. Use that as the base match #}
+OriginalName=*
+MACAddress={{ interface.macaddr }}
 
 [Link]
-{# Name should only exist for network_interfaces, not bridges or bonds #}
-{% if interface.name is defined %}
+{# We always set a name.  Unless the user overrides it, this is the #}
+{# biosdevname of the interface #}
 Name={{ interface.name }}
-{% endif %}
 WakeOnLan=off
 {% if not is_bond|default(false) %}
 MTUBytes={{ config.mtu|default(defaultmtu) }}

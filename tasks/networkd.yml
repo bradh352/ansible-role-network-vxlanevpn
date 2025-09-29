@@ -1,9 +1,9 @@
 ---
 
-- name: "Networkd: Link: ethernet interfaces"
+- name: "Networkd: Link: physical interfaces"
   template:
     src: "networkd.link.j2"
-    dest: "/etc/systemd/network/10-eth-{{ interface.name|default(interface.ifname) }}.link"
+    dest: "/etc/systemd/network/10-{{ interface.name }}.link"
   vars:
     interface: "{{ item }}"
     config: "{{ item }}"
@@ -12,41 +12,32 @@
   when: network_interfaces is defined
   notify: network_restart
 
-- name: "Networkd: Link: underlay interfaces"
+- name: "Networkd: Link: underlay physical interfaces"
   template:
     src: "networkd.link.j2"
-    dest: "/etc/systemd/network/10-underlay-iface{{ index }}.link"
+    dest: "/etc/systemd/network/10-{{ interface.name }}.link"
   vars:
-    interface: "{{ item.interface }}"
-    config: "{{ item.config }}"
-    index: "{{ item.iface_index }}"
+    interface: "{{ item }}"
+    config: "{{ item }}"
     defaultmtu: 9100
-  loop: >-
-      {%- set items = [] %}
-      {%- for interface in network_underlay_interfaces %}
-      {%-   if interface.ifname|default("") not in network_bond_names + network_bridge_names + network_vlan_names %}
-      {%-     do items.append({ 'interface': interface, 'config': interface, 'iface_index': loop.index0 }) %}
-      {%-   endif %}
-      {%- endfor %}
-      {{- items -}}
+  with_items: "{{ network_underlay_interfaces | selectattr('is_phy', 'equalto', true) | list }}"
   when: network_underlay_interfaces is defined
   notify: network_restart
 
-- name: "Networkd: Link: bridge interfaces"
+- name: "Networkd: Link: bridge physical interfaces"
   template:
     src: "networkd.link.j2"
-    dest: "/etc/systemd/network/10-bridge-{{ config.name }}-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}.link"
+    dest: "/etc/systemd/network/10-{{ interface.name }}.link"
   vars:
     interface: "{{ item.interface }}"
     config: "{{ item.config }}"
-    index: "{{ item.iface_index }}"
     defaultmtu: "{{ item.config.mtu|default(9000) }}"
   loop: >-
       {%- set items = [] %}
       {%- for bridge in network_bridges %}
       {%-   for interface in bridge.interfaces|default([]) %}
-      {%-     if interface.ifname|default("") not in network_bond_names + network_vlan_names + network_interface_names %}
-      {%-       do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
+      {%-     if interface.is_phy %}
+      {%-       do items.append({ 'interface': interface, 'config': bridge }) %}
       {%-     endif %}
       {%-   endfor %}
       {%- endfor %}
@@ -54,21 +45,22 @@
   when: network_bridges is defined
   notify: network_restart
 
-- name: "Networkd: Link: bond interfaces"
+- name: "Networkd: Link: bond physical interfaces"
   template:
     src: "networkd.link.j2"
-    dest: "/etc/systemd/network/10-bond-{{ config.name }}-iface{{ index }}.link"
+    dest: "/etc/systemd/network/10-{{ interface.name }}.link"
   vars:
     interface: "{{ item.interface }}"
     config: "{{ item.config }}"
-    index: "{{ item.iface_index }}"
     defaultmtu: "{{ item.config.mtu|default(9000) }}"
     is_bond: true
   loop: >-
       {%- set items = [] %}
       {%- for bond in network_bonds %}
       {%-   for interface in bond.interfaces %}
-      {%-     do items.append({ 'interface': interface, 'config': bond, 'iface_index': loop.index0 }) %}
+      {%-     if interface.is_phy %}
+      {%-       do items.append({ 'interface': interface, 'config': bond }) %}
+      {%-     endif %}
       {%-   endfor %}
       {%- endfor %}
       {{- items -}}
@@ -149,7 +141,7 @@
 - name: "Networkd: Network: eth"
   template:
     src: "networkd.network.j2"
-    dest: "/etc/systemd/network/10-eth-{{ config.name|default(config.ifname) }}.network"
+    dest: "/etc/systemd/network/10-eth-{{ config.name }}.network"
   vars:
     config: "{{ item }}"
     type: "eth"
@@ -160,16 +152,14 @@
 - name: "Networkd: Network: underlay"
   template:
     src: "networkd.network.underlay.j2"
-    dest: "/etc/systemd/network/10-underlay-iface{{ index }}.network"
+    dest: "/etc/systemd/network/10-underlay-{{ interface.name }}.network"
   vars:
-    config: "{{ item.interface }}"
-    interface: "{{ item.config }}"
-    index: "{{ item.iface_index }}"
+    interface: "{{ item }}"
   loop: >-
       {%- set items = [] %}
       {%- for interface in network_underlay_interfaces %}
-      {%-   if interface.ifname|default("") not in network_bond_names + network_bridge_names + network_vlan_names %}
-      {%-     do items.append({ 'interface': interface, 'config': interface, 'iface_index': loop.index0 }) %}
+      {%-   if interface.name not in network_bond_names + network_bridge_names + network_vlan_names %}
+      {%-     do items.append(interface) %}
       {%-   endif %}
       {%- endfor %}
       {{- items -}}
@@ -179,16 +169,15 @@
 - name: "Networkd: Network: bond iface"
   template:
     src: "networkd.network.bond_iface.j2"
-    dest: "/etc/systemd/network/40-bond-{{ config.name }}-iface{{ index }}.network"
+    dest: "/etc/systemd/network/40-bond-{{ config.name }}-{{ interface.name }}.network"
   vars:
     config: "{{ item.config }}"
     interface: "{{ item.interface }}"
-    index: "{{ item.iface_index }}"
   loop: >-
       {%- set items = [] %}
       {%- for bond in network_bonds %}
       {%-   for interface in bond.interfaces %}
-      {%-     do items.append({ 'interface': interface, 'config': bond, 'iface_index': loop.index0 }) %}
+      {%-     do items.append({ 'interface': interface, 'config': bond }) %}
       {%-   endfor %}
       {%- endfor %}
       {{- items -}}
@@ -198,16 +187,15 @@
 - name: "Networkd: Network: bridge iface"
   template:
     src: "networkd.network.bridge_iface.j2"
-    dest: "/etc/systemd/network/50-{{ interface.ifname if interface.ifname is defined else 'iface' ~ index }}-attachedto-{{ config.name }}.network"
+    dest: "/etc/systemd/network/50-{{ interface.name }}-attachedto-{{ config.name }}.network"
   vars:
     config: "{{ item.config }}"
     interface: "{{ item.interface }}"
-    index: "{{ item.iface_index }}"
   loop: >-
       {%- set items = [] %}
       {%- for bridge in network_bridges %}
       {%-   for interface in bridge.interfaces|default([]) %}
-      {%-     do items.append({ 'interface': interface, 'config': bridge, 'iface_index': loop.index0 }) %}
+      {%-     do items.append({ 'interface': interface, 'config': bridge }) %}
       {%-   endfor %}
       {%- endfor %}
       {{- items -}}

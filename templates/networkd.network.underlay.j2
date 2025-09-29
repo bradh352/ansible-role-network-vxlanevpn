@@ -1,9 +1,12 @@
-{# VXLAN underlay interface bringup: #}
-{#  - config: dictionary containing configuration #}
-{% include "networkd.network.match.j2" %}
+{# VXLAN underlay interface bringup #}
+[Match]
+{% if interface.is_phy %}
+Type=ether
+{% endif %}
+Name={{ interface.name }}
 
 [Link]
-MTUBytes={{ config.mtu | default(9100) }}
+MTUBytes={{ interface.mtu | default(9100) }}
 
 [Network]
 KeepConfiguration=yes

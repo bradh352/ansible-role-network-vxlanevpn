@@ -149,18 +149,6 @@
   set_fact:
     network_vlan_names: "{{ network_vlans|default([]) | map(attribute='name') | list }}"
 
-- name: "Cache interface names"
-  set_fact:
-    network_interface_names: "{{ (network_interfaces|default([]) | selectattr('name', 'defined') | map(attribute='name') | list) + (network_interfaces|default([]) | rejectattr('name', 'defined') | map(attribute='ifname') | list) }}"
-
-- name: "Validate configuration"
-  set_fact:
-    validate_interfaces: "{{ lookup('template', 'validate_config.j2') }}"
-
-- name: "See if vxlan is using vlan aware bridging"
-  set_fact:
-    vxlan_vlan_bridge: "{{ true if network_vxlans | default([]) | map(attribute='vlan') | select('defined') | list | length > 0 else false }}"
-
 - name: "Retrieve original interface names if remapped"
   script: iface_orig_names.sh
   register: orig_names_str
@@ -169,6 +157,54 @@
 - name: "Load original interface names dictionary"
   set_fact:
     network_orig_iface_names: "{{ orig_names_str.stdout|from_yaml }}"
+
+- name: "Cache interface names"
+  set_fact:
+    network_interface_names: "{{ (network_interfaces|default([]) | selectattr('name', 'defined') | map(attribute='name') | list) }}"
+
+- name: "Resolve physical interfaces"
+  set_fact:
+    network_interfaces_data: "{{ lookup('template', 'resolve_ifaces.j2') }}"
+  vars:
+    configname: "network_interfaces"
+    interfaces: "{{ network_interfaces|default([]) }}"
+    extra_ifnames: []
+    max_interfaces: 1
+
+- name: "Resolve underlay interfaces"
+  set_fact:
+    network_underlay_interfaces_data: "{{ lookup('template', 'resolve_ifaces.j2') }}"
+  vars:
+    configname: "network_underlay_interfaces"
+    interfaces: "{{ network_underlay_interfaces|default([]) }}"
+    extra_ifnames: "{{ network_interface_names + network_bond_names + network_bridge_names }}"
+
+- name: "Resolve bond interfaces"
+  set_fact:
+    network_bonds_data: "{{ lookup('template', 'resolve_ifaces_list.j2') }}"
+  vars:
+    configname: "network_bonds"
+    config: "{{ network_bond|default([]) }}"
+    extra_ifnames: "{{ network_interface_names }}"
+
+- name: "Resolve bridge interfaces"
+  set_fact:
+    network_bridges_data: "{{ lookup('template', 'resolve_ifaces_list.j2') }}"
+  vars:
+    configname: "network_bridges"
+    config: "{{ network_bridges|default([]) }}"
+    extra_ifnames: "{{ network_interface_names + network_bond_names }}"
+
+- name: "Replace configuration data with resolved"
+  set_fact:
+    network_interfaces: "{{ network_interfaces_data | from_yaml }}"
+    network_underlay_interfaces: "{{ network_underlay_interfaces_data | from_yaml }}"
+    network_bonds: "{{ network_bonds_data | from_yaml }}"
+    network_bridges: "{{ network_bridges_data | from_yaml }}"
+
+- name: "See if vxlan is using vlan aware bridging"
+  set_fact:
+    vxlan_vlan_bridge: "{{ true if network_vxlans | default([]) | map(attribute='vlan') | select('defined') | list | length > 0 else false }}"
 
 - name: "Set Expected Configuration Files"
   set_fact:
@@ -244,12 +280,14 @@
     paths: /etc/netplan
     file_type: file
   register: netplan_files
+  when: ansible_os_family == 'Debian'
 
 - name: "Delete unused netplan configuration files"
   file:
     path: "{{ item.path }}"
     state: absent
   with_items: "{{ netplan_files['files'] }}"
+  when: ansible_os_family == 'Debian'
 
 - name: "ensure cloud init doesn't have network config"
   file:

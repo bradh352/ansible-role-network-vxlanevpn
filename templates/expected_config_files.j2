@@ -4,22 +4,24 @@
 {%     do files.append("10-lo.network") %}
 {%   endif %}
 {%   for iface in network_interfaces|default([]) %}
-{%     do files.append("10-eth-" ~ iface.name|default(iface.ifname) ~ ".link") %}
-{%     if iface.name|default(iface.ifname) not in network_bridge_iface_names or iface.addresses|default([])|count > 0 or iface.dhcp|default(false) %}
-{%       do files.append("10-eth-" ~ iface.name|default(iface.ifname) ~ ".network") %}
+{%     do files.append("10-" ~ iface.name ~ ".link") %}
+{%     if iface.name not in network_bridge_iface_names or iface.addresses|default([])|count > 0 or iface.dhcp|default(false) %}
+{%       do files.append("10-eth-" ~ iface.name ~ ".network") %}
 {%     endif %}
 {%   endfor %}
 {%   for iface in network_underlay_interfaces|default([]) %}
-{%     if iface.ifname|default("") not in network_bridge_names + network_bond_names + network_vlan_names %}
-{%       do files.append("10-underlay-iface" ~ loop.index0 ~ ".link") %}
-{%       do files.append("10-underlay-iface" ~ loop.index0 ~ ".network") %}
+{%     if iface.is_phy %}
+{%       do files.append("10-" ~ iface.name ~ ".link") %}
+{%     endif %}
+{%     if iface.name not in network_bridge_names + network_bond_names + network_vlan_names %}
+{%       do files.append("10-underlay-" ~ iface.name ~ ".network") %}
 {%     endif %}
 {%   endfor %}
 {%   for bond in network_bonds|default([]) %}
 {%     do files.append("20-bond-" ~ bond.name ~ ".netdev") %}
 {%     for interface in bond.interfaces %}
-{%       do files.append("10-bond-" ~ bond.name ~ "-iface" ~ loop.index0 ~ ".link") %}
-{%       do files.append("40-bond-" ~ bond.name ~ "-iface" ~ loop.index0 ~ ".network") %}
+{%       do files.append("10-" ~ interface.name ~ ".link") %}
+{%       do files.append("40-bond-" ~ bond.name ~ "-" ~ interface.name ~ ".network") %}
 {%     endfor %}
 {%     if bond.name not in network_bridge_iface_names or bond.addresses|default([])|count > 0 or bond.dhcp|default(false) %}
 {%       do files.append("60-bond-" ~ bond.name ~ ".network") %}
@@ -28,10 +30,10 @@
 {%   for bridge in network_bridges|default([]) %}
 {%     do files.append("30-bridge-" ~ bridge.name ~ ".netdev") %}
 {%     for interface in bridge.interfaces|default([]) %}
-{%       if interface.ifname|default("") not in network_bond_names + network_vlan_names + network_interface_names %}
-{%         do files.append("10-bridge-" ~ bridge.name ~ (interface.ifname if interface.ifname is defined else 'iface' ~ loop.index0) ~ ".link") %}
+{%       if interface.is_phy %}
+{%         do files.append("10-" ~ interface.name ~ ".link") %}
 {%       endif %}
-{%       do files.append("50-" ~ (interface.ifname if interface.ifname is defined else 'iface' ~ loop.index0) ~ "-attachedto-" ~ bridge.name ~ ".network") %}
+{%       do files.append("50-" ~ interface.name ~ "-attachedto-" ~ bridge.name ~ ".network") %}
 {%     endfor %}
 {%     do files.append("60-bridge-" ~ bridge.name ~ ".network") %}
 {%   endfor %}
@@ -52,7 +54,7 @@
 {% elif ansible_os_family == 'RedHat' %}
 {# We only support basic interfaces on RedHat right now #}
 {%   for iface in network_interfaces|default([]) %}
-{%     do files.append(iface.name|default(iface.ifname) ~ ".nmconnection") %}
+{%     do files.append(iface.name ~ ".nmconnection") %}
 {%   endfor %}
 {% endif %}
 {{- files | sort -}}

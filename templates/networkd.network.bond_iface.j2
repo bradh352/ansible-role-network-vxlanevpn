@@ -1,7 +1,9 @@
 {# Requires variables: #}
 {#   - config: general configuration for bond #}
 {#   - interface: specific interface #}
-{% include "networkd.network.match.j2" %}
+[Match]
+Type=ether
+Name={{ interface.name }}
 
 [Link]
 Promiscuous=true

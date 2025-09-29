@@ -1,0 +1,9 @@
+{% import 'macros/ip_funcs.j2' as ipfn %}
+{% set config_list = [] %}
+{% for entry in config %}
+{%   set item = entry.copy() %}
+{%   set iface_list = ipfn.resolve_ifnames_list(configname ~ '[' ~ loop.index0 ~ ']', ansible_facts, network_orig_iface_names, entry.interfaces | default([]), extra_ifnames=extra_ifnames) %}
+{%   do item.update({ "interfaces": iface_list }) %}
+{%   do config_list.append(item) %}
+{% endfor %}
+{{- config_list -}}

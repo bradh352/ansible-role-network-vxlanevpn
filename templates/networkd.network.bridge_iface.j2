@@ -1,12 +1,8 @@
 {# Requires variables: #}
 {#   - config: general configuration for bridge #}
 {#   - interface: specific interface #}
-{% if interface.ifname | default("") in network_bond_names or interface.ifname|default("") in network_vlan_names %}
 [Match]
-Name={{ interface.ifname }}
-{% else %}
-{% include "networkd.network.match.j2" %}
-{% endif %}
+Name={{ interface.name }}
 
 [Link]
 MTUBytes={{ config.mtu | default(1500) }}
