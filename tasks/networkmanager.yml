@@ -2,7 +2,7 @@
 - name: Write interface configuration
   template:
     src: iface.nmconnection.j2
-    dest: "/etc/NetworkManager/system-connections/{{ iface.name|default(iface.ifname) }}.nmconnection"
+    dest: "/etc/NetworkManager/system-connections/{{ iface.name }}.nmconnection"
     owner: root
     mode: "600"
   vars:

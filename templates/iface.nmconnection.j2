@@ -20,11 +20,10 @@
 {%   endif %}
 {% endfor %}
 [connection]
-id={{ iface.name|default(iface.ifname) }}
-uuid={{ iface.name|default(iface.ifname)|ansible.builtin.to_uuid }}
+id={{ iface.name }}
+uuid={{ iface.name|ansible.builtin.to_uuid }}
 type=ethernet
-{% set ifnames = ipfn.resolve_ifnames(iface.name|default(iface.ifname), ansible_facts, network_orig_iface_names, iface) | from_yaml %}
-interface-name={{ ifnames[0].name }}
+interface-name={{ iface.name }}
 
 [ipv4]
 {% if iface.dhcp|default(false) %}
