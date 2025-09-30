@@ -72,7 +72,7 @@ router bgp {{ network_underlay_asn }}
     advertise-all-vni
     advertise-svi-ip
   !
-{% if network_underlay_interfaces is defined %}
+{% if network_underlay_interfaces|default([])|length > 0 %}
 {%   for interface in network_underlay_interfaces %}
   neighbor {{ interface.name }} interface peer-group PEERS
 {%   endfor %}
