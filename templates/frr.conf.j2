@@ -73,14 +73,8 @@ router bgp {{ network_underlay_asn }}
     advertise-svi-ip
   !
 {% if network_underlay_interfaces is defined %}
-{%   set bond_ifnames = network_bonds|default([]) | map(attribute='name') | list %}
-{%   set bridge_ifnames = network_bridges|default([]) | map(attribute='name') | list %}
-{%   set vlan_ifnames = network_vlans|default([]) | map(attribute='name') | list %}
 {%   for interface in network_underlay_interfaces %}
-{%     set ifnames = ipfn.resolve_ifnames('network_underlay_interfaces[' ~ loop.index0 ~ ']', ansible_facts, network_orig_iface_names, interface, bond_ifnames + bridge_ifnames + vlan_ifnames) | from_yaml %}
-{%     for ifname in ifnames %}
-  neighbor {{ ifname }} interface peer-group PEERS
-{%     endfor %}
+  neighbor {{ interface.name }} interface peer-group PEERS
 {%   endfor %}
 {% else %}
 {%   set peers = [] %}
