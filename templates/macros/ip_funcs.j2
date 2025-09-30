@@ -8,7 +8,7 @@
 {%   if data['name'] is not defined %}
 {%     do data.update({ 'name': orig_ifname(orignamemap, iface_name) }) %}
 {%   endif %}
-{%   set macaddr = ansible_facts[iface_name].perm_macaddress|default(ansible_facts[iface_name].macaddress|default("")) %}
+{%   set macaddr = "" if ansible_facts[host_iface].module is not defined else ansible_facts[iface_name].perm_macaddress|default(ansible_facts[iface_name].macaddress|default("")) %}
 {%   if macaddr | length > 0 %}
 {%     do data.update({ 'macaddr': macaddr }) %}
 {%     do data.update({ 'is_phy': true}) %}
@@ -31,7 +31,7 @@
 {%     do iface_list.append(update_interface(interface, ansible_facts, orignamemap, interface.ifname)) %}
 {%   elif interface.macaddr is defined %}
 {%     for host_iface in ansible_facts.interfaces %}
-{%       if ansible_facts[host_iface].perm_macaddress|default(ansible_facts[host_iface].macaddress|default("")) == interface.macaddr %}
+{%       if ansible_facts[host_iface].module is defined and ansible_facts[host_iface].perm_macaddress|default(ansible_facts[host_iface].macaddress|default("")) == interface.macaddr %}
 {%         do iface_list.append(update_interface(interface, ansible_facts, orignamemap, host_iface)) %}
 {%       endif %}
 {%     endfor %}
