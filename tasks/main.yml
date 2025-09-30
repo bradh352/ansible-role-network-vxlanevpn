@@ -184,7 +184,7 @@
     network_bonds_data: "{{ lookup('template', 'resolve_ifaces_list.j2') }}"
   vars:
     configname: "network_bonds"
-    config: "{{ network_bond|default([]) }}"
+    config: "{{ network_bonds|default([]) }}"
     extra_ifnames: "{{ network_interface_names }}"
 
 - name: "Resolve bridge interfaces"
