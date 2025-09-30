@@ -1,0 +1,3 @@
+{% import 'macros/ip_funcs.j2' as ipfn %}
+{% set iface_list=ipfn.resolve_ifnames_list(configname, ansible_facts, network_orig_iface_names, interfaces, extra_ifnames=extra_ifnames, max_interfaces=max_interfaces|default(0)) %}
+{{- iface_list -}}
