@@ -2,7 +2,7 @@
 {#   - config: general configuration for vxlan interface #}
 {#   - network_bridges: configuration for network bridges #}
 [Match]
-Name=vxlan{{ config.vni }}
+Name=vxl{{ config.vni }}
 
 [Link]
 MTUBytes={{ config.mtu | default(1500) }}

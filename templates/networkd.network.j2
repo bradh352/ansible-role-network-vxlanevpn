@@ -25,7 +25,7 @@ VLAN={{ vlan.name }}
 {% if type == "bridge" and config.vlan_aware|default(true) %}
 {%   for vxlan in network_vxlans|default([]) %}
 {%     if vxlan.ifname == config.name | default(config.ifname) %}
-VXLAN=vxlan{{ vxlan.vni }}
+VXLAN=vxl{{ vxlan.vni }}
 {%     endif %}
 {%   endfor %}
 {% endif %}
