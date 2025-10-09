@@ -58,8 +58,7 @@ systemd system with minimal effort.
     * `autonegotiation`: Boolean. Whether or not to enable autonegotiation.
       Default is `true`.
     * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
-      `llrs`. Defaults to `auto` if link speed specified is less than `25000`
-      otherwise defaults to `auto` (including if link speed not specifed).
+      `llrs`.
 * `network_underlay_peergroups`: If using VXLAN-EVPN but not using BGP
   Unnumbered, specify a *list* of groups that contain members to be peered with.
   Each member of the specified groups must contain `network_underlay_srcip` or
@@ -119,8 +118,7 @@ systemd system with minimal effort.
   * `autonegotiation`: Boolean. Whether or not to enable autonegotiation.
     Default is `true`.
   * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
-    `llrs`. Defaults to `auto` if link speed specified is less than `25000`
-    otherwise defaults to `auto` (including if link speed not specifed).
+    `llrs`.
 * `network_bonds`: Create LACP network bonds. Multiple interfaces may be
    specified in a bond, and when using pattern matching or driver matching
    those too may resolve to multiple interfaces.
@@ -139,8 +137,7 @@ systemd system with minimal effort.
     * `autonegotiation`: Boolean. Whether or not to enable autonegotiation.
       Default is `true`.
     * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
-      `llrs`. Defaults to `auto` if link speed specified is less than `25000`
-      otherwise defaults to `auto` (including if link speed not specifed).
+      `llrs`.
   * `mtu`: MTU. Defaults to `1500`.  Recommended `9000` for Jumbo Frames.
   * `dhcp`: Default `false`. Set to true to use dhcp (also enables ipv6 RA).
     Cannot be used with `addresses`.
@@ -187,8 +184,7 @@ systemd system with minimal effort.
     * `autonegotiation`: Boolean. Whether or not to enable autonegotiation.
       Default is `true`.
     * `fec`: The FEC type to use. Valid values are: `auto`, `off`, `rs`, `baser`,
-      `llrs`. Defaults to `auto` if link speed specified is less than `25000`
-      otherwise defaults to `auto` (including if link speed not specifed).
+      `llrs`.
     * `vlans`: List of vlans.  May be either a single vlan or a range, e.g. `10-20`.
     * `pvid`: Primary vlan id of interface.  Untagged ingress packets shall have
       this tag set, and egress packets in this vlan shall be sent out untagged.
