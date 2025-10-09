@@ -193,7 +193,7 @@
   vars:
     configname: "network_bridges"
     config: "{{ network_bridges|default([]) }}"
-    extra_ifnames: "{{ network_interface_names + network_bond_names }}"
+    extra_ifnames: "{{ network_interface_names + network_bond_names + network_vlan_names }}"
 
 - name: "Replace configuration data with resolved"
   set_fact:

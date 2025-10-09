@@ -3,9 +3,7 @@
 {#   - config: general configuration for bond, bridge or interface #}
 {#   - defaultmtu: default MTU size to use if not specified #}
 [Match]
-Type=ether
 {# We always resolve the macaddr. Use that as the base match #}
-OriginalName=*
 MACAddress={{ interface.macaddr }}
 
 [Link]
@@ -19,5 +17,6 @@ MTUBytes={{ config.mtu|default(defaultmtu) }}
 {% if interface.speed is defined %}
 BitsPerSecond={{ interface.speed }}
 {% endif %}
-Duplex=full
-AutoNegotiation={{ 'yes' if interface.autonegotiation|default(true) else 'no' }}
+{% if interface.autonegotiation is defined %}
+AutoNegotiation={{ 'yes' if interface.autonegotiation else 'no' }}
+{% endif %}
