@@ -4,14 +4,18 @@ case "$IFACE" in
 {# ------ VXLAN UNDERLAY PHYSICAL INTERFACES ------ #}
 {% for interface in network_underlay_interfaces|selectattr('is_phy', 'equalto', true)|list %}
     {{ interface.name }})
-      ethtool --set-fec {{ interface.name }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
+{%    if interface.fec is defined %}
+      ethtool --set-fec {{ interface.name }} encoding {{ interface.fec }}
+{%    endif %}
       ;;
 {% endfor %}
 {# ------ BOND PHYSICAL ETHERNET INTERFACES ------ #}
 {% for bond in network_bonds|default([]) %}
 {%   for interface in bond.interfaces|selectattr('is_phy', 'equalto', true)|list %}
     {{ interface.name }})
-      ethtool --set-fec {{ interface.name }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
+{%    if interface.fec is defined %}
+      ethtool --set-fec {{ interface.name }} encoding {{ interface.fec }}
+{%    endif %}
       ;;
 {%   endfor %}
 {% endfor %}
@@ -19,14 +23,18 @@ case "$IFACE" in
 {% for bridge in network_bridges|default([]) %}
 {%   for interface in bridge.interfaces|selectattr('is_phy', 'equalto', true)|list %}
     {{ interface.name }})
-      ethtool --set-fec {{ interface.name }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
+{%    if interface.fec is defined %}
+      ethtool --set-fec {{ interface.name }} encoding {{ interface.fec }}
+{%    endif %}
       ;;
 {%   endfor %}
 {% endfor %}
 {# ------ PHYSICAL ETHERNET INTERFACES ------ #}
 {% for interface in network_interfaces|list %}
     {{ interface.name }})
-      ethtool --set-fec {{ interface.name }} encoding {{ interface.fec|default('auto' if interface.speed|default(0) >= 25000 else 'rs') }}
+{%    if interface.fec is defined %}
+      ethtool --set-fec {{ interface.name }} encoding {{ interface.fec }}
+{%    endif %}
       ;;
 {% endfor %}
     *)
