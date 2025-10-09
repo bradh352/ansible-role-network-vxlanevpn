@@ -299,8 +299,8 @@
     rule: allow
     port: 179
     proto: tcp
-    src: "{{ 'fe80::/10' if network_underlay_interfaces is defined else omit }}"
-    dest: "{{ 'fe80::/10' if network_underlay_interfaces is defined else network_underlay_srcip }}"
+    src: "{{ 'fe80::/10' if network_underlay_interfaces|default([])|length > 0 else omit }}"
+    dest: "{{ 'fe80::/10' if network_underlay_interfaces|default([])|length > 0 else network_underlay_srcip }}"
   when: network_vtep_ip is defined and ansible_os_family == 'Debian'
 
 - name: "UFW: allow BFD"
@@ -308,8 +308,8 @@
     rule: allow
     port: 3784
     proto: udp
-    src: "{{ 'fe80::/10' if network_underlay_interfaces is defined else omit }}"
-    dest: "{{ 'fe80::/10' if network_underlay_interfaces is defined else network_underlay_srcip }}"
+    src: "{{ 'fe80::/10' if network_underlay_interfaces|default([])|length > 0 else omit }}"
+    dest: "{{ 'fe80::/10' if network_underlay_interfaces|default([])|length > 0 else network_underlay_srcip }}"
   when: network_vtep_ip is defined and ansible_os_family == 'Debian'
 
 - name: "UFW: allow VXLAN VTEP"
