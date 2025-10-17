@@ -48,6 +48,9 @@ gateway={{ ns.v4_gateway }}
 {% if iface.nameservers.addresses|default([])|ansible.utils.ipv4|length > 0 %}
 dns={{ iface.nameservers.addresses|default([])|ansible.utils.ipv4|join(";") }};
 {% endif %}
+{% if iface.nameservers.search|default([])|length > 0 %}
+dns-search={{ iface.nameservers.search|join(";") }};
+{% endif %}
 {% for route in v4_routes %}
 route{{ loop.index }}={{route["to"]}},{{route["via"]}}
 {% endfor %}
