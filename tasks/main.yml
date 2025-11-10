@@ -268,6 +268,29 @@
   notify: frr_reload
   when: network_vtep_ip is defined
 
+# See https://scottstuff.net/posts/2025/02/25/frr-vs-systemd-networkd/
+# NOTE: the alternative `no zebra nexthop kernel enable` doesn't work for VXLAN
+#       and we're on systemd v255
+- name: "FRR: when using systemd-networkd, restart frr when systemd-networkd is restarted"
+  when: network_vtep_ip is defined and ansible_os_family == 'Debian'
+  block:
+    - name: "ensure systemd frr override directory exists"
+      file:
+        path: /etc/systemd/system/systemd-networkd.service.d
+        state: directory
+        owner: "root"
+        mode: "0755"
+    - name: "systemd install override"
+      copy:
+        src: frr.override.conf
+        dest: /etc/systemd/system/systemd-networkd.service.d/override.conf
+        mode: "0644"
+        owner: root
+      register: frr_override
+    - name: "systemd reload"
+      when: frr_override.changed
+      shell: "systemctl daemon-reload"
+
 - name: "FRR: ensure enabled and started"
   service:
     name: frr
