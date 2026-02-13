@@ -1,7 +1,6 @@
 ---
-
 - name: "Reboot (one node at a time)"
-  reboot:
+  ansible.builtin.reboot:
     msg: "rebooting now"
     connect_timeout: 10
     post_reboot_delay: 15
@@ -9,7 +8,7 @@
   listen: network_vxlanevpn_reboot
 
 - name: sysctl_restart
-  service:
+  ansible.builtin.service:
     name: systemd-sysctl
     state: restarted
 
@@ -20,9 +19,8 @@
   listen: network_vxlanevpn_reboot
 
 - name: network_restart
-  include_tasks: "tasks/network_restart.yml"
-
+  ansible.builtin.include_tasks: "tasks/network_restart.yml"
 - name: frr_reload
-  service:
+  ansible.builtin.service:
     name: frr
     state: reloaded
