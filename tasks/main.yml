@@ -1,5 +1,4 @@
 ---
-
 - name: "APT: Install required packages"
   ansible.builtin.apt:
     pkg:
@@ -17,31 +16,33 @@
   when: ansible_os_family == 'RedHat'
 
 - name: "VXLAN: Sanity check base config: vtep/asn"
-  fail:
+  ansible.builtin.fail:
     msg: "if network_vtep_ip or network_underlay_asn is defined, both must be"
   when: (network_vtep_ip is defined or network_underlay_asn is defined) and (network_vtep_ip is not defined or network_underlay_asn is not defined)
 
 - name: "VXLAN: Sanity check base config: vtep/vxlaniface"
-  fail:
+  ansible.builtin.fail:
     msg: "network_vtep_ip is not defined, but network_vxlans is defined"
   when: network_vtep_ip is not defined and network_vxlans is defined
 
 - name: "VXLAN: Sanity check base config: vtep/underlay"
-  fail:
+  ansible.builtin.fail:
     msg: "network_vtep_ip is not defined, but network_underlay_interfaces is defined"
   when: network_vtep_ip is not defined and network_underlay_interfaces is defined
 
 - name: "VXLAN: Sanity check peer configuration"
-  fail:
+  ansible.builtin.fail:
     msg: "must provide network_underlay_interfaces or network_underlay_peergroups for vxlan evpn peering"
   when: network_vtep_ip is defined and (network_underlay_interfaces|default([])|length == 0 and network_underlay_peergroups|default([])|length == 0)
 
 - name: "VXLAN: Sanity check peergroup configuration"
-  fail:
+  ansible.builtin.fail:
     msg: "must provide network_underlay_srcip when using network_underlay_peergroups is used"
   when: network_vtep_ip is defined and network_underlay_peergroups is defined and network_underlay_srcip is not defined
 
 - name: FRR
+  when: network_vtep_ip is defined
+
   block:
     - name: "APT: Install FRR"
       ansible.builtin.apt:
@@ -61,7 +62,7 @@
 
     # FRR 8.4.4 in Ubuntu 24.04 has an issue resolved by https://github.com/FRRouting/frr/pull/12524
     - name: "Check installed FRR version"
-      shell: "dpkg -l frr | grep ii | awk '{ print $3 }'"
+      ansible.builtin.shell: "dpkg -l frr | grep ii | awk '{ print $3 }'"
       changed_when: false
       register: frr_version
       when: ansible_distribution == "Ubuntu"
@@ -78,27 +79,24 @@
       run_once: true
 
     - name: "Send patched FRR to remote"
-      copy:
+      ansible.builtin.copy:
         src: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
         dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
         mode: "600"
       when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
 
     - name: "Install patched FRR"
-      shell: "dpkg -i /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb"
+      ansible.builtin.command: "dpkg -i /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb"
       when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
       notify: network_restart
 
     - name: "Cleanup download"
-      file:
+      ansible.builtin.file:
         path: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
         state: absent
       delegate_to: localhost
       become: false
       when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
-  when: network_vtep_ip is defined
-
-
 - name: "APT: Purge undesired packages"
   ansible.builtin.apt:
     pkg:
@@ -111,11 +109,11 @@
   when: ansible_os_family == 'Debian'
 
 - name: "FRR: enable bgp and bfd"
-  lineinfile:
-     path: /etc/frr/daemons
-     regexp: "^{{ item.key }}=.*"
-     line: "{{ item.key }}={{ item.val }}"
-     state: present
+  ansible.builtin.lineinfile:
+    path: /etc/frr/daemons
+    regexp: "^{{ item.key }}=.*"
+    line: "{{ item.key }}={{ item.val }}"
+    state: present
   with_items:
     - key: "bgpd"
       val: "yes"
@@ -125,19 +123,19 @@
   when: network_vtep_ip is defined
 
 - name: "Cache bond names"
-  set_fact:
-    network_bond_names: "{{ network_bonds|default([]) | map(attribute='name') | list }}"
+  ansible.builtin.set_fact:
+    network_bond_names: "{{ network_bonds | default([]) | map(attribute='name') | list }}"
 
 - name: "Cache bridge names"
-  set_fact:
-    network_bridge_names: "{{ network_bridges|default([]) | map(attribute='name') | list }}"
+  ansible.builtin.set_fact:
+    network_bridge_names: "{{ network_bridges | default([]) | map(attribute='name') | list }}"
 
 - name: "Cache bridge interface names"
-  set_fact:
+  ansible.builtin.set_fact:
     network_bridge_iface_names: >-
       {%- set items = [] %}
-      {%- for bridge in network_bridges|default([]) %}
-      {%-   for interface in bridge.interfaces|default([]) %}
+      {%- for bridge in network_bridges | default([]) %}
+      {%-   for interface in bridge.interfaces | default([]) %}
       {%-     if interface.ifname is defined %}
       {%-       do items.append(interface.ifname) %}
       {%-     endif %}
@@ -146,85 +144,85 @@
       {{- items -}}
 
 - name: "Cache vlan names"
-  set_fact:
-    network_vlan_names: "{{ network_vlans|default([]) | map(attribute='name') | list }}"
+  ansible.builtin.set_fact:
+    network_vlan_names: "{{ network_vlans | default([]) | map(attribute='name') | list }}"
 
 - name: "Retrieve original interface names if remapped"
-  script: iface_orig_names.sh
+  ansible.builtin.script: iface_orig_names.sh
   register: orig_names_str
-  changed_when: False
+  changed_when: false
 
 - name: "Load original interface names dictionary"
-  set_fact:
-    network_orig_iface_names: "{{ orig_names_str.stdout|from_yaml }}"
+  ansible.builtin.set_fact:
+    network_orig_iface_names: "{{ orig_names_str.stdout | from_yaml }}"
 
 - name: "Cache interface names"
-  set_fact:
-    network_interface_names: "{{ (network_interfaces|default([]) | selectattr('name', 'defined') | map(attribute='name') | list) }}"
+  ansible.builtin.set_fact:
+    network_interface_names: "{{ (network_interfaces | default([]) | selectattr('name', 'defined') | map(attribute='name') | list) }}"
 
 - name: "Resolve physical interfaces"
-  set_fact:
+  ansible.builtin.set_fact:
     network_interfaces_data: "{{ lookup('template', 'resolve_ifaces.j2') }}"
   vars:
     configname: "network_interfaces"
-    interfaces: "{{ network_interfaces|default([]) }}"
+    interfaces: "{{ network_interfaces | default([]) }}"
     extra_ifnames: []
     max_interfaces: 1
 
 - name: "Resolve underlay interfaces"
-  set_fact:
+  ansible.builtin.set_fact:
     network_underlay_interfaces_data: "{{ lookup('template', 'resolve_ifaces.j2') }}"
   vars:
     configname: "network_underlay_interfaces"
-    interfaces: "{{ network_underlay_interfaces|default([]) }}"
+    interfaces: "{{ network_underlay_interfaces | default([]) }}"
     extra_ifnames: "{{ network_interface_names + network_bond_names + network_bridge_names }}"
 
 - name: "Resolve bond interfaces"
-  set_fact:
+  ansible.builtin.set_fact:
     network_bonds_data: "{{ lookup('template', 'resolve_ifaces_list.j2') }}"
   vars:
     configname: "network_bonds"
-    config: "{{ network_bonds|default([]) }}"
+    config: "{{ network_bonds | default([]) }}"
     extra_ifnames: "{{ network_interface_names }}"
 
 - name: "Resolve bridge interfaces"
-  set_fact:
+  ansible.builtin.set_fact:
     network_bridges_data: "{{ lookup('template', 'resolve_ifaces_list.j2') }}"
   vars:
     configname: "network_bridges"
-    config: "{{ network_bridges|default([]) }}"
+    config: "{{ network_bridges | default([]) }}"
     extra_ifnames: "{{ network_interface_names + network_bond_names + network_vlan_names }}"
 
 - name: "Replace configuration data with resolved"
-  set_fact:
+  ansible.builtin.set_fact:
     network_interfaces: "{{ network_interfaces_data | from_yaml }}"
     network_underlay_interfaces: "{{ network_underlay_interfaces_data | from_yaml }}"
     network_bonds: "{{ network_bonds_data | from_yaml }}"
     network_bridges: "{{ network_bridges_data | from_yaml }}"
 
 - name: "See if vxlan is using vlan aware bridging"
-  set_fact:
+  ansible.builtin.set_fact:
     vxlan_vlan_bridge: "{{ true if network_vxlans | default([]) | map(attribute='vlan') | select('defined') | list | length > 0 else false }}"
 
 - name: "Set Expected Configuration Files"
-  set_fact:
+  ansible.builtin.set_fact:
     expected_config_files: "{{ lookup('template', 'expected_config_files.j2') | from_yaml }}"
 
 - name: "Find stale config files"
-  find:
+  ansible.builtin.find:
     paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
     excludes: "{{ expected_config_files }}"
   register: network_config_files
 
 - name: "Delete unused network configuration files"
-  file:
+  ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
   with_items: "{{ network_config_files['files'] }}"
 
 - name: "See if we are on a fresh configuration"
-  find:
+  ansible.builtin.find:
     paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
   register: network_config_files
@@ -232,27 +230,27 @@
   notify: network_vxlanevpn_reboot
 
 - name: "Configure Networkd on Debian-like systems"
-  include_tasks: "networkd.yml"
+  ansible.builtin.include_tasks: "networkd.yml"
   when: ansible_os_family == 'Debian'
 
 - name: "Configure NetworkManager on RedHat-like systems"
-  include_tasks: "networkmanager.yml"
+  ansible.builtin.include_tasks: "networkmanager.yml"
   when: ansible_os_family == 'RedHat'
 
 - name: "Check Unexpected Configuration Files"
-  find:
+  ansible.builtin.find:
     paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
     excludes: "{{ expected_config_files }}"
   register: network_config_files
 
 - name: "Verify Unexpected Configuration Files"
-  fail:
+  ansible.builtin.fail:
     msg: "Found unexpected configuration files {{ network_config_files['files'] | map(attribute='path') | list }}"
   when: network_config_files['files']|length != 0
 
 - name: "Sysctl: Neeeded parameters for FRR"
-  copy:
+  ansible.builtin.copy:
     src: sysctl_99-frr.conf
     dest: /etc/sysctl.d/99-frr.conf
     mode: "660"
@@ -260,7 +258,7 @@
   when: network_vtep_ip is defined
 
 - name: "FRR: write configuration"
-  template:
+  ansible.builtin.template:
     backup: true
     src: frr.conf.j2
     dest: /etc/frr/frr.conf
@@ -275,13 +273,13 @@
   when: network_vtep_ip is defined and ansible_os_family == 'Debian'
   block:
     - name: "ensure systemd frr override directory exists"
-      file:
+      ansible.builtin.file:
         path: /etc/systemd/system/systemd-networkd.service.d
         state: directory
         owner: "root"
         mode: "0755"
     - name: "systemd install override"
-      copy:
+      ansible.builtin.copy:
         src: frr.override.conf
         dest: /etc/systemd/system/systemd-networkd.service.d/override.conf
         mode: "0644"
@@ -289,31 +287,30 @@
       register: frr_override
     - name: "systemd reload"
       when: frr_override.changed
-      shell: "systemctl daemon-reload"
-
+      ansible.builtin.command: "systemctl daemon-reload"
 - name: "FRR: ensure enabled and started"
-  service:
+  ansible.builtin.service:
     name: frr
     state: started
     enabled: true
   when: network_vtep_ip is defined
 
 - name: "Find stale system netplan files"
-  find:
+  ansible.builtin.find:
     paths: /etc/netplan
     file_type: file
   register: netplan_files
   when: ansible_os_family == 'Debian'
 
 - name: "Delete unused netplan configuration files"
-  file:
+  ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
   with_items: "{{ netplan_files['files'] }}"
   when: ansible_os_family == 'Debian'
 
 - name: "ensure cloud init doesn't have network config"
-  file:
+  ansible.builtin.file:
     path: "/etc/cloud/cloud.cfg.d/50-curtin-networking.cfg"
     state: absent
 
@@ -322,8 +319,8 @@
     rule: allow
     port: 179
     proto: tcp
-    src: "{{ 'fe80::/10' if network_underlay_interfaces|default([])|length > 0 else omit }}"
-    dest: "{{ 'fe80::/10' if network_underlay_interfaces|default([])|length > 0 else network_underlay_srcip }}"
+    src: "{{ 'fe80::/10' if network_underlay_interfaces | default([]) | length > 0 else omit }}"
+    dest: "{{ 'fe80::/10' if network_underlay_interfaces | default([]) | length > 0 else network_underlay_srcip }}"
   when: network_vtep_ip is defined and ansible_os_family == 'Debian'
 
 - name: "UFW: allow BFD"
@@ -331,8 +328,8 @@
     rule: allow
     port: 3784
     proto: udp
-    src: "{{ 'fe80::/10' if network_underlay_interfaces|default([])|length > 0 else omit }}"
-    dest: "{{ 'fe80::/10' if network_underlay_interfaces|default([])|length > 0 else network_underlay_srcip }}"
+    src: "{{ 'fe80::/10' if network_underlay_interfaces | default([]) | length > 0 else omit }}"
+    dest: "{{ 'fe80::/10' if network_underlay_interfaces | default([]) | length > 0 else network_underlay_srcip }}"
   when: network_vtep_ip is defined and ansible_os_family == 'Debian'
 
 - name: "UFW: allow VXLAN VTEP"
@@ -341,11 +338,11 @@
     port: 4789
     proto: udp
     src: "{{ network_vtep_ip }}"
-    dest: "{{ network_vtep_ip|split('/')|first }}/32"
+    dest: "{{ network_vtep_ip | split('/') | first }}/32"
   when: network_vtep_ip is defined and ansible_os_family == 'Debian'
 
 - name: "UFW: ensure ufw is enabled and started"
-  service:
+  ansible.builtin.service:
     name: ufw
     state: started
     enabled: true
