@@ -6,14 +6,14 @@
       - ufw
       - bridge-utils
     state: present
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts['os_family'] == 'Debian'
 
 - name: "DNF: Install required packages"
   ansible.builtin.dnf:
     name:
       - firewalld
     state: present
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts['os_family'] == 'RedHat'
 
 - name: "VXLAN: Sanity check base config: vtep/asn"
   ansible.builtin.fail:
@@ -50,7 +50,7 @@
           - frr
         state: present
       notify: network_vxlanevpn_reboot
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts['os_family'] == 'Debian'
 
     - name: "DNF: Install FRR"
       ansible.builtin.dnf:
@@ -58,7 +58,7 @@
           - frr
         state: present
       notify: network_vxlanevpn_reboot
-      when: ansible_os_family == 'RedHat'
+      when: ansible_facts['os_family'] == 'RedHat'
 
 - name: "APT: Purge undesired packages"
   ansible.builtin.apt:
@@ -69,7 +69,7 @@
       - netplan.io
     purge: true
     state: absent
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts['os_family'] == 'Debian'
 
 - name: "FRR: enable bgp and bfd"
   ansible.builtin.lineinfile:
@@ -173,7 +173,7 @@
 
 - name: "Find stale config files"
   ansible.builtin.find:
-    paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
+    paths: "{{ '/etc/systemd/network' if ansible_facts['os_family'] == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
     excludes: "{{ expected_config_files }}"
   register: network_config_files
@@ -186,7 +186,7 @@
 
 - name: "See if we are on a fresh configuration"
   ansible.builtin.find:
-    paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
+    paths: "{{ '/etc/systemd/network' if ansible_facts['os_family'] == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
   register: network_config_files
   changed_when: network_config_files["files"] | length == 0
@@ -194,15 +194,15 @@
 
 - name: "Configure Networkd on Debian-like systems"
   ansible.builtin.include_tasks: "networkd.yml"
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts['os_family'] == 'Debian'
 
 - name: "Configure NetworkManager on RedHat-like systems"
   ansible.builtin.include_tasks: "networkmanager.yml"
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts['os_family'] == 'RedHat'
 
 - name: "Check Unexpected Configuration Files"
   ansible.builtin.find:
-    paths: "{{ '/etc/systemd/network' if ansible_os_family == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
+    paths: "{{ '/etc/systemd/network' if ansible_facts['os_family'] == 'Debian' else '/etc/NetworkManager/system-connections/' }}"
     file_type: file
     excludes: "{{ expected_config_files }}"
   register: network_config_files
@@ -233,7 +233,7 @@
 # NOTE: the alternative `no zebra nexthop kernel enable` doesn't work for VXLAN
 #       and we're on systemd v255
 - name: "FRR: when using systemd-networkd, restart frr when systemd-networkd is restarted"
-  when: network_vtep_ip is defined and ansible_os_family == 'Debian'
+  when: network_vtep_ip is defined and ansible_facts['os_family'] == 'Debian'
   block:
     - name: "ensure systemd frr override directory exists"
       ansible.builtin.file:
@@ -263,14 +263,14 @@
     paths: /etc/netplan
     file_type: file
   register: netplan_files
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts['os_family'] == 'Debian'
 
 - name: "Delete unused netplan configuration files"
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
   with_items: "{{ netplan_files['files'] }}"
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts['os_family'] == 'Debian'
 
 - name: "ensure cloud init doesn't have network config"
   ansible.builtin.file:
@@ -284,7 +284,7 @@
     proto: tcp
     src: "{{ 'fe80::/10' if network_underlay_interfaces | default([]) | length > 0 else omit }}"
     dest: "{{ 'fe80::/10' if network_underlay_interfaces | default([]) | length > 0 else network_underlay_srcip }}"
-  when: network_vtep_ip is defined and ansible_os_family == 'Debian'
+  when: network_vtep_ip is defined and ansible_facts['os_family'] == 'Debian'
 
 - name: "UFW: allow BFD"
   community.general.ufw:
@@ -293,7 +293,7 @@
     proto: udp
     src: "{{ 'fe80::/10' if network_underlay_interfaces | default([]) | length > 0 else omit }}"
     dest: "{{ 'fe80::/10' if network_underlay_interfaces | default([]) | length > 0 else network_underlay_srcip }}"
-  when: network_vtep_ip is defined and ansible_os_family == 'Debian'
+  when: network_vtep_ip is defined and ansible_facts['os_family'] == 'Debian'
 
 - name: "UFW: allow VXLAN VTEP"
   community.general.ufw:
@@ -302,14 +302,14 @@
     proto: udp
     src: "{{ network_vtep_ip }}"
     dest: "{{ network_vtep_ip | split('/') | first }}/32"
-  when: network_vtep_ip is defined and ansible_os_family == 'Debian'
+  when: network_vtep_ip is defined and ansible_facts['os_family'] == 'Debian'
 
 - name: "UFW: ensure ufw is enabled and started"
   ansible.builtin.service:
     name: ufw
     state: started
     enabled: true
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts['os_family'] == 'Debian'
 
 # We want to flush any handlers to make sure BGP comes online at this point as
 # other roles may require connectivity provided.
