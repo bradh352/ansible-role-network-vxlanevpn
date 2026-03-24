@@ -60,43 +60,6 @@
       notify: network_vxlanevpn_reboot
       when: ansible_os_family == 'RedHat'
 
-    # FRR 8.4.4 in Ubuntu 24.04 has an issue resolved by https://github.com/FRRouting/frr/pull/12524
-    - name: "Check installed FRR version"
-      ansible.builtin.shell: "dpkg -l frr | grep ii | awk '{ print $3 }'"
-      changed_when: false
-      register: frr_version
-      when: ansible_distribution == "Ubuntu"
-
-    - name: "Download patched FRR"
-      ansible.builtin.get_url:
-        url: https://bradhouse.dev/wp-content/uploads/2025/06/frr_8.4.4-1.99deb12u1_amd64.deb
-        dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
-        mode: "600"
-      become: false
-      delegate_to: localhost
-      when: hostvars[item]['frr_version'].stdout|default("") == '8.4.4-1.1ubuntu6.3'
-      with_items: "{{ play_hosts }}"
-      run_once: true
-
-    - name: "Send patched FRR to remote"
-      ansible.builtin.copy:
-        src: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
-        dest: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
-        mode: "600"
-      when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
-
-    - name: "Install patched FRR"
-      ansible.builtin.command: "dpkg -i /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb"
-      when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
-      notify: network_restart
-
-    - name: "Cleanup download"
-      ansible.builtin.file:
-        path: /tmp/frr_8.4.4-1.99~deb12u1_amd64.deb
-        state: absent
-      delegate_to: localhost
-      become: false
-      when: frr_version.stdout|default("") == "8.4.4-1.1ubuntu6.3"
 - name: "APT: Purge undesired packages"
   ansible.builtin.apt:
     pkg:
@@ -195,10 +158,10 @@
 
 - name: "Replace configuration data with resolved"
   ansible.builtin.set_fact:
-    network_interfaces: "{{ network_interfaces_data | from_yaml }}"
-    network_underlay_interfaces: "{{ network_underlay_interfaces_data | from_yaml }}"
-    network_bonds: "{{ network_bonds_data | from_yaml }}"
-    network_bridges: "{{ network_bridges_data | from_yaml }}"
+    network_interfaces: "{{ network_interfaces_data }}"
+    network_underlay_interfaces: "{{ network_underlay_interfaces_data }}"
+    network_bonds: "{{ network_bonds_data }}"
+    network_bridges: "{{ network_bridges_data }}"
 
 - name: "See if vxlan is using vlan aware bridging"
   ansible.builtin.set_fact:
@@ -206,7 +169,7 @@
 
 - name: "Set Expected Configuration Files"
   ansible.builtin.set_fact:
-    expected_config_files: "{{ lookup('template', 'expected_config_files.j2') | from_yaml }}"
+    expected_config_files: "{{ lookup('template', 'expected_config_files.j2') }}"
 
 - name: "Find stale config files"
   ansible.builtin.find:

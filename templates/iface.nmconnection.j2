@@ -5,13 +5,13 @@
 {% set v6_routes=[] %}
 {% set ns = namespace(v4_gateway='',v6_gateway='') %}
 {% for route in iface.routes | default([]) %}
-{%   if route.to | ansible.utils.ipv4 | length > 0 %}
+{%   if route.to | default("") | ansible.utils.ipv4 | length > 0 %}
 {%     if route.to == "0.0.0.0/0" %}
 {%       set ns.v4_gateway=route.via %}
 {%     else %}
 {%       do v4_routes.append(route) %}
 {%     endif %}
-{%   elif route.to | ansible.utils.ipv4 | length > 0 %}
+{%   elif route.to | default("") | ansible.utils.ipv4 | length > 0 %}
 {%     if route.to == "::/0" %}
 {%       set ns.v6_gateway=route.via %}
 {%     else %}
