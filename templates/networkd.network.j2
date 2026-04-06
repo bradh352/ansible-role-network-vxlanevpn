@@ -72,8 +72,8 @@ Address={{ address }}
 {%   for nameserver in config.nameservers.addresses|default([]) %}
 DNS={{ nameserver }}
 {%   endfor %}
-{%   if config.nameservers.domains is defined %}
-Domains={{ config.nameservers.domains | join(" ") }}
+{%   if config.nameservers.search is defined %}
+Domains={{ config.nameservers.search | join(" ") }}
 {%   endif %}
 {% endif %}
 
