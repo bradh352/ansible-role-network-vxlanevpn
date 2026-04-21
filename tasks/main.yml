@@ -237,14 +237,14 @@
   block:
     - name: "ensure systemd frr override directory exists"
       ansible.builtin.file:
-        path: /etc/systemd/system/systemd-networkd.service.d
+        path: /etc/systemd/system/frr.service.d
         state: directory
         owner: "root"
         mode: "0755"
     - name: "systemd install override"
       ansible.builtin.copy:
         src: frr.override.conf
-        dest: /etc/systemd/system/systemd-networkd.service.d/override.conf
+        dest: /etc/systemd/system/frr.service.d/override.conf
         mode: "0644"
         owner: root
       register: frr_override
