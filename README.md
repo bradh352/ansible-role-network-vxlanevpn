@@ -42,8 +42,9 @@ systemd system with minimal effort.
   network.  These are BGP unnumbered interfaces that cannot be used for
   any other purpose.  These interfaces may be an ethernet interface, a
   configured bond, a configured bridge, or a configured vlan interface.  If not
-  using this option, then `network_underlay_peergroup` and
-  `network_underlay_srcip` must be specified when using VXLAN-EVPN.  This
+  using this option, then `network_underlay_srcip` and at least one of
+  `network_underlay_peergroups` or `network_underlay_peers` must be specified
+  when using VXLAN-EVPN.  This
   configuration must specify only ***one*** of `iface`, `pattern`, `macaddr`,
   or `driver` below.
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  This is also
@@ -63,6 +64,11 @@ systemd system with minimal effort.
   Unnumbered, specify a *list* of groups that contain members to be peered with.
   Each member of the specified groups must contain `network_underlay_srcip` or
   an error will be thrown.
+* `network_underlay_peers`: If using VXLAN-EVPN but not using BGP Unnumbered,
+  a *list* of peer IP addresses to peer with in addition to any members of
+  `network_underlay_peergroups`.  Use this for peers that are not hosts in the
+  inventory, such as a pair of switches participating in the VXLAN fabric.
+  e.g. `["10.10.0.253", "10.10.0.254"]`
 * `network_underlay_srcip`: If using VXLAN-EVPN but not using BGP
   Unnumbered, this is the source ip address for BGP peering which is required
   for this use-case.
