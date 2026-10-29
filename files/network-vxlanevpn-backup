@@ -252,7 +252,9 @@ cmd_restore() {
     case "$reply" in y|Y|yes|YES) ;; *) echo "aborted"; exit 1 ;; esac
   fi
 
-  cmd_snapshot --label pre-restore
+  # No pruning here: the snapshot being restored may be the oldest.
+  cmd_snapshot --label pre-restore --keep "$(( $(snapshot_ids | wc -l) + 1 ))"
+  [[ -f "$BACKUP_DIR/$id/manifest" ]] || die "snapshot $id disappeared; nothing was changed"
 
   for p in "${PATHS[@]}"; do
     rm -rf -- "$p"
