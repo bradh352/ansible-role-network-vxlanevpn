@@ -35,6 +35,10 @@ systemd system with minimal effort.
   underlay.  A subnet mask must be specified for the firewall to know what
   address ranges are allowed, however only a `/32` will be advertised.
   e.g. `172.17.0.2/24`
+* `network_vtep_sources`: List of subnets whose VTEPs may send VXLAN to this
+  host.  Defaults to the subnet of `network_vtep_ip`.  Add the switches' VTEP
+  subnet when they terminate VNIs this host also carries, e.g.
+  `["172.17.0.0/24", "172.16.1.0/24"]`.
 * `network_underlay_asn`: Required when using VXLAN-EVPN. Autonomous System
    Number to use for the underlay. This should be unique across the underly.
    The private ASN range is `64512` to `65534` and `4200000000` to `4294967294`.
@@ -44,7 +48,10 @@ systemd system with minimal effort.
   configured bond, a configured bridge, or a configured vlan interface.  If not
   using this option, then `network_underlay_srcip` and at least one of
   `network_underlay_peergroups` or `network_underlay_peers` must be specified
-  when using VXLAN-EVPN.  This
+  when using VXLAN-EVPN.  When set, `network_underlay_peergroups`,
+  `network_underlay_peers` and `network_underlay_srcip` are ignored for this
+  host, and other hosts leave it out of their peers, so a group can move to
+  BGP Unnumbered one host at a time.  This
   configuration must specify only ***one*** of `iface`, `pattern`, `macaddr`,
   or `driver` below.
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  This is also
@@ -63,7 +70,8 @@ systemd system with minimal effort.
 * `network_underlay_peergroups`: If using VXLAN-EVPN but not using BGP
   Unnumbered, specify a *list* of groups that contain members to be peered with.
   Each member of the specified groups must contain `network_underlay_srcip` or
-  an error will be thrown.
+  an error will be thrown, except members using `network_underlay_interfaces`,
+  which are skipped.
 * `network_underlay_peers`: If using VXLAN-EVPN but not using BGP Unnumbered,
   a *list* of peer IP addresses to peer with in addition to any members of
   `network_underlay_peergroups`.  Use this for peers that are not hosts in the
@@ -72,6 +80,11 @@ systemd system with minimal effort.
 * `network_underlay_srcip`: If using VXLAN-EVPN but not using BGP
   Unnumbered, this is the source ip address for BGP peering which is required
   for this use-case.
+* `network_vxlanevpn_apply`: Default `true`.  Set to `false` to write the
+  configuration without applying it: no network restart, FRR reload or reboot.
+  It takes effect at the next reboot.  Use it to stage a configuration that
+  only works once the host is recabled, e.g.
+  `-e network_vxlanevpn_apply=false`.
 * `network_underlay_mtu`: MTU to use for all underlay interfaces.  Defaults
   to `9100` if not specified.  This must be at least 54 bytes greater than
   the largest `network_vxlans` mtu.

@@ -38,7 +38,7 @@
 - name: "VXLAN: Sanity check peergroup configuration"
   ansible.builtin.fail:
     msg: "must provide network_underlay_srcip when network_underlay_peergroups or network_underlay_peers is used"
-  when: network_vtep_ip is defined and (network_underlay_peergroups is defined or network_underlay_peers is defined) and network_underlay_srcip is not defined
+  when: network_vtep_ip is defined and network_underlay_interfaces|default([])|length == 0 and (network_underlay_peergroups is defined or network_underlay_peers is defined) and network_underlay_srcip is not defined
 
 - name: FRR
   when: network_vtep_ip is defined
@@ -300,8 +300,9 @@
     rule: allow
     port: 4789
     proto: udp
-    src: "{{ network_vtep_ip }}"
+    src: "{{ item }}"
     dest: "{{ network_vtep_ip | split('/') | first }}/32"
+  loop: "{{ network_vtep_sources | default([network_vtep_ip]) }}"
   when: network_vtep_ip is defined and ansible_facts['os_family'] == 'Debian'
 
 - name: "UFW: ensure ufw is enabled and started"

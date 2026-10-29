@@ -44,7 +44,8 @@ router bgp {{ network_underlay_asn }}
   neighbor PEERS advertisement-interval 5
   neighbor PEERS bfd
   neighbor PEERS capability extended-nexthop
-{% if network_underlay_srcip is defined %}
+{# Unnumbered sessions run over IPv6 link-local, so an IPv4 source would break them. #}
+{% if network_underlay_srcip is defined and network_underlay_interfaces|default([])|length == 0 %}
   neighbor PEERS update-source {{ network_underlay_srcip }}
 {% endif %}
   !
@@ -80,7 +81,8 @@ router bgp {{ network_underlay_asn }}
 {%   set peers = network_underlay_peers|default([])|list %}
 {%   for groupname in network_underlay_peergroups|default([]) %}
 {%     for host in groups[groupname] %}
-{%       if host != inventory_hostname %}
+{#       A member on BGP Unnumbered peers with the switches, not with us. #}
+{%       if host != inventory_hostname and hostvars[host]['network_underlay_interfaces']|default([])|length == 0 %}
 {%         if hostvars[host]['network_underlay_srcip'] is not defined %}
 {{ notdefined | mandatory(msg='network_underlay_srcip not defined for host ' ~ host) }}
 {%         endif %}

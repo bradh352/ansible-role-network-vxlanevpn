@@ -6,6 +6,7 @@
     post_reboot_delay: 15
   throttle: 1
   listen: network_vxlanevpn_reboot
+  when: network_vxlanevpn_apply | default(true)
 
 - name: sysctl_restart
   ansible.builtin.service:
@@ -20,7 +21,9 @@
 
 - name: network_restart
   ansible.builtin.include_tasks: "tasks/network_restart.yml"
+  when: network_vxlanevpn_apply | default(true)
 - name: frr_reload
   ansible.builtin.service:
     name: frr
     state: reloaded
+  when: network_vxlanevpn_apply | default(true)
