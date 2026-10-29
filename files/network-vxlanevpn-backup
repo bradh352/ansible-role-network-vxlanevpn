@@ -1,0 +1,289 @@
+#!/bin/bash
+#
+# network-vxlanevpn-backup: snapshots of the network configuration the
+# network_vxlanevpn role manages, and a way back to one from the console.
+#
+# The role takes a snapshot at the start of every run, before it changes
+# anything. A snapshot identical to the newest one is not kept, so each one is
+# a distinct configuration the host has had. Nothing here needs the network,
+# Ansible or Python: it is meant to be run from a serial or BMC console on a
+# host whose new configuration did not come up.
+#
+# Usage:
+#   network-vxlanevpn-backup list
+#   network-vxlanevpn-backup show [ID]
+#   network-vxlanevpn-backup restore [ID] [-y] [--no-reboot]
+#   network-vxlanevpn-backup snapshot [--label TEXT] [--keep N]
+#
+#   list       every snapshot, newest last; the one matching the live
+#              configuration is marked
+#   show       what restoring ID would change (a diff, snapshot -> live)
+#   restore    put ID back, then reboot. The live configuration is
+#              snapshotted first (label "pre-restore"), so running restore
+#              again goes forward to it
+#   snapshot   take a snapshot now. --keep prunes all but the newest N
+#              (default 20)
+#
+# ID defaults, for show and restore, to the newest snapshot that differs from
+# the live configuration: the state before the last change.
+#
+# A reboot is the default after a restore because it is the dependable way to
+# bring up a different set of interfaces. With --no-reboot, apply it yourself:
+#   systemctl restart systemd-networkd && systemctl restart frr
+#
+# UFW rules are not part of a snapshot: the role only ever adds them.
+
+set -euo pipefail
+
+BACKUP_DIR="${NETWORK_VXLANEVPN_BACKUP_DIR:-/var/backups/network-vxlanevpn}"
+
+# Everything the role writes or deletes. A path that does not exist is recorded
+# as absent, so a restore also removes what a newer configuration added.
+PATHS=(
+  /etc/systemd/network
+  /etc/systemd/networkd.conf
+  /etc/NetworkManager/system-connections
+  /etc/netplan
+  /etc/networkd-dispatcher/configuring.d
+  /etc/frr/frr.conf
+  /etc/frr/daemons
+  /etc/systemd/system/frr.service.d
+  /etc/sysctl.d/99-frr.conf
+  /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
+)
+
+die() { echo "error: $*" >&2; exit 1; }
+
+usage() {
+  awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "$0"
+}
+
+need_root() {
+  [[ $EUID -eq 0 ]] || die "must be run as root"
+}
+
+exists() { [[ -e "$1" || -L "$1" ]]; }
+
+# One line per file, directory and symlink under PATHS: type, path, mode,
+# owner and content hash. $1 is a root prefix: empty for the live system, or a
+# snapshot's root/ directory. Two configurations are the same when their
+# manifests are.
+manifest() {
+  local root="$1" p f rel
+  for p in "${PATHS[@]}"; do
+    if ! exists "$root$p"; then
+      printf 'absent %s\n' "$p"
+      continue
+    fi
+    while IFS= read -r -d '' f; do
+      rel="${f#"$root"}"
+      if [[ -L "$f" ]]; then
+        printf 'l %s -> %s\n' "$rel" "$(readlink "$f")"
+      elif [[ -d "$f" ]]; then
+        printf 'd %s %s\n' "$rel" "$(stat -c '%a %u %g' "$f")"
+      else
+        printf 'f %s %s %s\n' "$rel" "$(stat -c '%a %u %g' "$f")" \
+          "$(sha256sum < "$f" | cut -d' ' -f1)"
+      fi
+    done < <(find "$root$p" -print0 | sort -z)
+  done
+}
+
+snapshot_ids() {
+  [[ -d "$BACKUP_DIR" ]] || return 0
+  find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' \
+    | grep -E '^[0-9]{8}T[0-9]{6}Z(-[0-9]+)?$' | sort || true
+}
+
+label_of() { cat "$BACKUP_DIR/$1/label" 2>/dev/null || echo "?"; }
+
+# The newest snapshot whose manifest differs from $1 (the live manifest).
+previous_id() {
+  local live="$1" id
+  while read -r id; do
+    [[ -n "$id" ]] || continue
+    if [[ "$(cat "$BACKUP_DIR/$id/manifest")" != "$live" ]]; then
+      echo "$id"
+      return 0
+    fi
+  done < <(snapshot_ids | sort -r)
+  return 1
+}
+
+resolve_id() {  # $1: an ID or empty
+  if [[ -n "$1" ]]; then
+    [[ -d "$BACKUP_DIR/$1" && -f "$BACKUP_DIR/$1/manifest" ]] || die "no snapshot $1 (see: $0 list)"
+    echo "$1"
+  else
+    previous_id "$(manifest "")" || die "no snapshot differs from the live configuration"
+  fi
+}
+
+cmd_snapshot() {
+  local label="manual" keep=20
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --label) label="${2:?--label needs a value}"; shift 2 ;;
+      --keep)  keep="${2:?--keep needs a value}"; shift 2 ;;
+      *) die "snapshot: unknown argument $1" ;;
+    esac
+  done
+  [[ "$keep" =~ ^[1-9][0-9]*$ ]] || die "--keep must be a positive number"
+  need_root
+
+  local live newest id n=1 tmp p
+  live="$(manifest "")"
+  newest="$(snapshot_ids | tail -n1)"
+  if [[ -n "$newest" && "$(cat "$BACKUP_DIR/$newest/manifest")" == "$live" ]]; then
+    echo "unchanged: the live configuration matches $newest"
+    return 0
+  fi
+
+  mkdir -p "$BACKUP_DIR"
+  chmod 0700 "$BACKUP_DIR"
+  id="$(date -u +%Y%m%dT%H%M%SZ)"
+  while [[ -e "$BACKUP_DIR/$id" ]]; do id="${id%%-*}-$n"; n=$((n + 1)); done
+
+  # Built under a temporary name and renamed, so an interrupted snapshot never
+  # looks like a complete one.
+  tmp="$BACKUP_DIR/.tmp.$id"
+  rm -rf -- "$tmp"
+  mkdir -p "$tmp/root"
+  : > "$tmp/absent"
+  for p in "${PATHS[@]}"; do
+    if exists "$p"; then
+      mkdir -p "$tmp/root$(dirname "$p")"
+      cp -a -- "$p" "$tmp/root$p"
+    else
+      echo "$p" >> "$tmp/absent"
+    fi
+  done
+  echo "$label" > "$tmp/label"
+  printf '%s\n' "$live" > "$tmp/manifest"
+  mv -- "$tmp" "$BACKUP_DIR/$id"
+  echo "created $id ($label)"
+
+  local count old
+  count="$(snapshot_ids | wc -l)"
+  if [[ "$count" -gt "$keep" ]]; then
+    snapshot_ids | head -n "$((count - keep))" | while read -r old; do
+      rm -rf -- "${BACKUP_DIR:?}/$old"
+      echo "pruned $old"
+    done
+  fi
+}
+
+cmd_list() {
+  local live id ids mark
+  ids="$(snapshot_ids)"
+  if [[ -z "$ids" ]]; then
+    echo "no snapshots in $BACKUP_DIR"
+    return 0
+  fi
+  live="$(manifest "")"
+  printf '%-22s %-14s %s\n' "ID" "LABEL" ""
+  while read -r id; do
+    mark=""
+    [[ "$(cat "$BACKUP_DIR/$id/manifest")" == "$live" ]] && mark="= live configuration"
+    printf '%-22s %-14s %s\n' "$id" "$(label_of "$id")" "$mark"
+  done <<< "$ids"
+}
+
+# What restoring $1 would change, as a diff from the snapshot to the live
+# configuration. Returns 0 even when they differ.
+show_diff() {
+  local root="$BACKUP_DIR/$1/root" p
+  for p in "${PATHS[@]}"; do
+    if exists "$root$p" && exists "$p"; then
+      diff -ruN "$root$p" "$p" || true
+    elif exists "$root$p"; then
+      echo "only in snapshot: $p (restore puts it back)"
+    elif exists "$p"; then
+      echo "only live: $p (restore removes it)"
+    fi
+  done
+}
+
+# One line per file restoring $1 would change, add or remove.
+show_summary() {
+  local root="$BACKUP_DIR/$1/root" p
+  for p in "${PATHS[@]}"; do
+    if exists "$root$p" && exists "$p"; then
+      diff -rq "$root$p" "$p" || true
+    elif exists "$root$p"; then
+      echo "only in snapshot: $p"
+    elif exists "$p"; then
+      echo "only live: $p"
+    fi
+  done | sed "s#$root#[snapshot]#g"
+}
+
+cmd_show() {
+  local id
+  id="$(resolve_id "${1:-}")"
+  echo "# snapshot $id ($(label_of "$id")) -> live configuration"
+  show_diff "$id"
+}
+
+cmd_restore() {
+  local want="" yes=0 reboot=1 id root p reply
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -y|--yes)    yes=1; shift ;;
+      --no-reboot) reboot=0; shift ;;
+      -*)          die "restore: unknown option $1" ;;
+      *)           [[ -z "$want" ]] || die "restore takes one ID"; want="$1"; shift ;;
+    esac
+  done
+  need_root
+  id="$(resolve_id "$want")"
+  root="$BACKUP_DIR/$id/root"
+  [[ -d "$root" ]] || die "snapshot $id is incomplete"
+
+  echo "Restoring snapshot $id ($(label_of "$id")) on $(hostname)."
+  echo "Differences from the live configuration:"
+  show_summary "$id" | sed 's/^/  /'
+  if [[ $yes -eq 0 ]]; then
+    if [[ $reboot -eq 1 ]]; then
+      read -r -p "Restore and reboot? [y/N] " reply
+    else
+      read -r -p "Restore? [y/N] " reply
+    fi
+    case "$reply" in y|Y|yes|YES) ;; *) echo "aborted"; exit 1 ;; esac
+  fi
+
+  # No pruning here: the snapshot being restored may be the oldest.
+  cmd_snapshot --label pre-restore --keep "$(( $(snapshot_ids | wc -l) + 1 ))"
+  [[ -f "$BACKUP_DIR/$id/manifest" ]] || die "snapshot $id disappeared; nothing was changed"
+
+  for p in "${PATHS[@]}"; do
+    rm -rf -- "$p"
+    if exists "$root$p"; then
+      mkdir -p "$(dirname "$p")"
+      cp -a -- "$root$p" "$p"
+    fi
+  done
+  systemctl daemon-reload
+  sync
+
+  if [[ "$(manifest "")" != "$(cat "$BACKUP_DIR/$id/manifest")" ]]; then
+    die "the live configuration does not match $id after restoring; check by hand before rebooting"
+  fi
+  echo "Restored $id."
+  if [[ $reboot -eq 1 ]]; then
+    echo "Rebooting in 5 seconds (Ctrl-C to stay up)..."
+    sleep 5
+    systemctl reboot
+  else
+    echo "Apply it with a reboot, or: systemctl restart systemd-networkd && systemctl restart frr"
+  fi
+}
+
+case "${1:-}" in
+  snapshot) shift; cmd_snapshot "$@" ;;
+  list)     shift; cmd_list ;;
+  show)     shift; cmd_show "$@" ;;
+  restore)  shift; cmd_restore "$@" ;;
+  -h|--help|help|"") usage ;;
+  *) die "unknown command $1 (see: $0 --help)" ;;
+esac

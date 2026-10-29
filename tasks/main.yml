@@ -32,13 +32,35 @@
 
 - name: "VXLAN: Sanity check peer configuration"
   ansible.builtin.fail:
-    msg: "must provide network_underlay_interfaces or network_underlay_peergroups for vxlan evpn peering"
-  when: network_vtep_ip is defined and (network_underlay_interfaces|default([])|length == 0 and network_underlay_peergroups|default([])|length == 0)
+    msg: "must provide network_underlay_interfaces, network_underlay_peergroups or network_underlay_peers for vxlan evpn peering"
+  when: network_vtep_ip is defined and (network_underlay_interfaces|default([])|length == 0 and network_underlay_peergroups|default([])|length == 0 and network_underlay_peers|default([])|length == 0)
 
 - name: "VXLAN: Sanity check peergroup configuration"
   ansible.builtin.fail:
-    msg: "must provide network_underlay_srcip when using network_underlay_peergroups is used"
-  when: network_vtep_ip is defined and network_underlay_peergroups is defined and network_underlay_srcip is not defined
+    msg: "must provide network_underlay_srcip when network_underlay_peergroups or network_underlay_peers is used"
+  when: network_vtep_ip is defined and network_underlay_interfaces|default([])|length == 0 and (network_underlay_peergroups is defined or network_underlay_peers is defined) and network_underlay_srcip is not defined
+
+# Before anything below changes the configuration, so there is always a way
+# back from the console: network-vxlanevpn-backup restore.
+- name: "Backup: install network-vxlanevpn-backup"
+  ansible.builtin.copy:
+    src: network-vxlanevpn-backup
+    dest: /usr/local/sbin/network-vxlanevpn-backup
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: "Backup: snapshot the network configuration"
+  ansible.builtin.command:
+    argv:
+      - /usr/local/sbin/network-vxlanevpn-backup
+      - snapshot
+      - --label
+      - ansible
+      - --keep
+      - "{{ network_vxlanevpn_backup_keep | default(20) }}"
+  register: network_backup
+  changed_when: network_backup.stdout is search('^created ', multiline=True)
 
 - name: FRR
   when: network_vtep_ip is defined
@@ -300,8 +322,9 @@
     rule: allow
     port: 4789
     proto: udp
-    src: "{{ network_vtep_ip }}"
+    src: "{{ item }}"
     dest: "{{ network_vtep_ip | split('/') | first }}/32"
+  loop: "{{ network_vtep_sources | default([network_vtep_ip]) }}"
   when: network_vtep_ip is defined and ansible_facts['os_family'] == 'Debian'
 
 - name: "UFW: ensure ufw is enabled and started"

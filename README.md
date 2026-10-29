@@ -27,6 +27,46 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.  This generates
 systemd-networkd configuration directly, so should be portable to any modern
 systemd system with minimal effort.
 
+## Backup and restore
+
+Every run starts by installing `/usr/local/sbin/network-vxlanevpn-backup` and
+taking a snapshot of the network configuration the role manages, before
+changing anything:
+
+* `/etc/systemd/network/` and `/etc/systemd/networkd.conf`
+* `/etc/NetworkManager/system-connections/`, `/etc/netplan/`
+* `/etc/networkd-dispatcher/configuring.d/`
+* `/etc/frr/frr.conf`, `/etc/frr/daemons`,
+  `/etc/systemd/system/frr.service.d/`
+* `/etc/sysctl.d/99-frr.conf`,
+  `/etc/cloud/cloud.cfg.d/50-curtin-networking.cfg`
+
+A snapshot is kept only if it differs from the newest one, so each snapshot is
+a configuration the host actually had.  They are kept in
+`/var/backups/network-vxlanevpn/`, the newest `network_vxlanevpn_backup_keep`
+of them.  UFW rules are not included: the role only ever adds them.
+
+The script needs no network, Ansible or Python, so it can be run from a serial
+or BMC console on a host whose new configuration did not come up:
+
+```
+network-vxlanevpn-backup list      # the snapshots, and which matches the live config
+network-vxlanevpn-backup show      # what a restore would change
+network-vxlanevpn-backup restore   # restore it and reboot
+```
+
+With no ID, `show` and `restore` use the newest snapshot that differs from
+the live configuration, which is the state before the last change.  `restore`
+snapshots the live configuration first, so running it a second time returns to
+the configuration you restored from.  It reboots by default.  Pass
+`--no-reboot` to apply it yourself, and `-y` to skip the prompt.
+
+Combined with `network_vxlanevpn_apply: false`, this lets you stage a
+configuration that only works once the host is recabled.  The run writes the
+new configuration without applying it, and the previous one is the snapshot
+`restore` picks by default.  Then power off, recable and power on.  If the
+host doesn't come up, run `restore` from the console.
+
 ## Variables used by this role
 
 * `network_vtep_ip`: Required when using VXLAN-EVPN. IPv4 address and subnet
@@ -35,6 +75,10 @@ systemd system with minimal effort.
   underlay.  A subnet mask must be specified for the firewall to know what
   address ranges are allowed, however only a `/32` will be advertised.
   e.g. `172.17.0.2/24`
+* `network_vtep_sources`: List of subnets whose VTEPs may send VXLAN to this
+  host.  Defaults to the subnet of `network_vtep_ip`.  Add the switches' VTEP
+  subnet when they terminate VNIs this host also carries, e.g.
+  `["172.17.0.0/24", "172.16.1.0/24"]`.
 * `network_underlay_asn`: Required when using VXLAN-EVPN. Autonomous System
    Number to use for the underlay. This should be unique across the underly.
    The private ASN range is `64512` to `65534` and `4200000000` to `4294967294`.
@@ -42,8 +86,12 @@ systemd system with minimal effort.
   network.  These are BGP unnumbered interfaces that cannot be used for
   any other purpose.  These interfaces may be an ethernet interface, a
   configured bond, a configured bridge, or a configured vlan interface.  If not
-  using this option, then `network_underlay_peergroup` and
-  `network_underlay_srcip` must be specified when using VXLAN-EVPN.  This
+  using this option, then `network_underlay_srcip` and at least one of
+  `network_underlay_peergroups` or `network_underlay_peers` must be specified
+  when using VXLAN-EVPN.  When set, `network_underlay_peergroups`,
+  `network_underlay_peers` and `network_underlay_srcip` are ignored for this
+  host, and other hosts leave it out of their peers, so a group can move to
+  BGP Unnumbered one host at a time.  This
   configuration must specify only ***one*** of `iface`, `pattern`, `macaddr`,
   or `driver` below.
     * `ifname`: exact interface name, e.g. `ens1`, `enp7s0f0np0`.  This is also
@@ -62,10 +110,23 @@ systemd system with minimal effort.
 * `network_underlay_peergroups`: If using VXLAN-EVPN but not using BGP
   Unnumbered, specify a *list* of groups that contain members to be peered with.
   Each member of the specified groups must contain `network_underlay_srcip` or
-  an error will be thrown.
+  an error will be thrown, except members using `network_underlay_interfaces`,
+  which are skipped.
+* `network_underlay_peers`: If using VXLAN-EVPN but not using BGP Unnumbered,
+  a *list* of peer IP addresses to peer with in addition to any members of
+  `network_underlay_peergroups`.  Use this for peers that are not hosts in the
+  inventory, such as a pair of switches participating in the VXLAN fabric.
+  e.g. `["10.10.0.253", "10.10.0.254"]`
 * `network_underlay_srcip`: If using VXLAN-EVPN but not using BGP
   Unnumbered, this is the source ip address for BGP peering which is required
   for this use-case.
+* `network_vxlanevpn_apply`: Default `true`.  Set to `false` to write the
+  configuration without applying it: no network restart, FRR reload or reboot.
+  It takes effect at the next reboot.  Use it to stage a configuration that
+  only works once the host is recabled, e.g.
+  `-e network_vxlanevpn_apply=false`.
+* `network_vxlanevpn_backup_keep`: Number of configuration snapshots to keep.
+  Default `20`.  See [Backup and restore](#backup-and-restore).
 * `network_underlay_mtu`: MTU to use for all underlay interfaces.  Defaults
   to `9100` if not specified.  This must be at least 54 bytes greater than
   the largest `network_vxlans` mtu.
