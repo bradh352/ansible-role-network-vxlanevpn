@@ -27,6 +27,46 @@ This role is initially targeting Ubuntu, and tested on 24.04LTS.  This generates
 systemd-networkd configuration directly, so should be portable to any modern
 systemd system with minimal effort.
 
+## Backup and restore
+
+Every run starts by installing `/usr/local/sbin/network-vxlanevpn-backup` and
+taking a snapshot of the network configuration the role manages, before
+changing anything:
+
+* `/etc/systemd/network/` and `/etc/systemd/networkd.conf`
+* `/etc/NetworkManager/system-connections/`, `/etc/netplan/`
+* `/etc/networkd-dispatcher/configuring.d/`
+* `/etc/frr/frr.conf`, `/etc/frr/daemons`,
+  `/etc/systemd/system/frr.service.d/`
+* `/etc/sysctl.d/99-frr.conf`,
+  `/etc/cloud/cloud.cfg.d/50-curtin-networking.cfg`
+
+A snapshot is kept only if it differs from the newest one, so each snapshot is
+a configuration the host actually had.  They are kept in
+`/var/backups/network-vxlanevpn/`, the newest `network_vxlanevpn_backup_keep`
+of them.  UFW rules are not included: the role only ever adds them.
+
+The script needs no network, Ansible or Python, so it can be run from a serial
+or BMC console on a host whose new configuration did not come up:
+
+```
+network-vxlanevpn-backup list      # the snapshots, and which matches the live config
+network-vxlanevpn-backup show      # what a restore would change
+network-vxlanevpn-backup restore   # restore it and reboot
+```
+
+With no ID, `show` and `restore` use the newest snapshot that differs from
+the live configuration, which is the state before the last change.  `restore`
+snapshots the live configuration first, so running it a second time returns to
+the configuration you restored from.  It reboots by default.  Pass
+`--no-reboot` to apply it yourself, and `-y` to skip the prompt.
+
+Combined with `network_vxlanevpn_apply: false`, this lets you stage a
+configuration that only works once the host is recabled.  The run writes the
+new configuration without applying it, and the previous one is the snapshot
+`restore` picks by default.  Then power off, recable and power on.  If the
+host doesn't come up, run `restore` from the console.
+
 ## Variables used by this role
 
 * `network_vtep_ip`: Required when using VXLAN-EVPN. IPv4 address and subnet
@@ -85,6 +125,8 @@ systemd system with minimal effort.
   It takes effect at the next reboot.  Use it to stage a configuration that
   only works once the host is recabled, e.g.
   `-e network_vxlanevpn_apply=false`.
+* `network_vxlanevpn_backup_keep`: Number of configuration snapshots to keep.
+  Default `20`.  See [Backup and restore](#backup-and-restore).
 * `network_underlay_mtu`: MTU to use for all underlay interfaces.  Defaults
   to `9100` if not specified.  This must be at least 54 bytes greater than
   the largest `network_vxlans` mtu.
