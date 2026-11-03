@@ -32,13 +32,13 @@
 
 - name: "VXLAN: Sanity check peer configuration"
   ansible.builtin.fail:
-    msg: "must provide network_underlay_interfaces or network_underlay_peergroups for vxlan evpn peering"
-  when: network_vtep_ip is defined and (network_underlay_interfaces|default([])|length == 0 and network_underlay_peergroups|default([])|length == 0)
+    msg: "must provide network_underlay_interfaces, network_underlay_peergroups or network_underlay_peers for vxlan evpn peering"
+  when: network_vtep_ip is defined and (network_underlay_interfaces|default([])|length == 0 and network_underlay_peergroups|default([])|length == 0 and network_underlay_peers|default([])|length == 0)
 
 - name: "VXLAN: Sanity check peergroup configuration"
   ansible.builtin.fail:
-    msg: "must provide network_underlay_srcip when using network_underlay_peergroups is used"
-  when: network_vtep_ip is defined and network_underlay_peergroups is defined and network_underlay_srcip is not defined
+    msg: "must provide network_underlay_srcip when network_underlay_peergroups or network_underlay_peers is used"
+  when: network_vtep_ip is defined and (network_underlay_peergroups is defined or network_underlay_peers is defined) and network_underlay_srcip is not defined
 
 - name: FRR
   when: network_vtep_ip is defined
