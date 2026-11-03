@@ -117,6 +117,13 @@ host doesn't come up, run `restore` from the console.
   `network_underlay_peergroups`.  Use this for peers that are not hosts in the
   inventory, such as a pair of switches participating in the VXLAN fabric.
   e.g. `["10.10.0.253", "10.10.0.254"]`
+* `network_underlay_bfd_interval`: BFD transmit and receive interval, in
+  milliseconds, for the underlay BGP sessions.  Default `1000`.
+* `network_underlay_bfd_multiplier`: Number of missed BFD packets before a peer
+  is declared down.  Default `3`, so with the default interval a peer must be
+  unreachable for 3 seconds before its BGP session is torn down.  BFD runs at
+  the slower of the two ends' timers, so a peer with shorter timers, such as a
+  switch, still waits this long for this host.
 * `network_underlay_srcip`: If using VXLAN-EVPN but not using BGP
   Unnumbered, this is the source ip address for BGP peering which is required
   for this use-case.

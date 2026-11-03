@@ -28,6 +28,16 @@ route-map ALLOW_VTEP permit 1
 !
 route-map ALLOW_VTEP deny 100
 !
+{# FRR's default of 300ms x 3 declares a peer dead after 0.9s, short enough
+   that a brief stall on a busy host or a sub-second blip on the fabric tears
+   down every BGP session on the host at once. #}
+bfd
+ profile UNDERLAY
+  detect-multiplier {{ network_underlay_bfd_multiplier | default(3) | int }}
+  receive-interval {{ network_underlay_bfd_interval | default(1000) | int }}
+  transmit-interval {{ network_underlay_bfd_interval | default(1000) | int }}
+ !
+!
 router bgp {{ network_underlay_asn }}
   bgp router-id {{ network_vtep_ip|split('/')|first }}
   bgp ebgp-requires-policy
@@ -42,7 +52,11 @@ router bgp {{ network_underlay_asn }}
   neighbor PEERS remote-as external
   neighbor PEERS timers 3 9
   neighbor PEERS advertisement-interval 5
+{# FRR shows a profile as both lines in its running config.  Write both, or
+   frr-reload sees the plain one as extra and sends "no neighbor PEERS bfd",
+   which tears down the BFD sessions and with them every BGP session. #}
   neighbor PEERS bfd
+  neighbor PEERS bfd profile UNDERLAY
   neighbor PEERS capability extended-nexthop
 {# Unnumbered sessions run over IPv6 link-local, so an IPv4 source would break them. #}
 {% if network_underlay_srcip is defined and network_underlay_interfaces|default([])|length == 0 %}
